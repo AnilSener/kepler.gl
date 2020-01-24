@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import domtoimage from 'dom-to-image';
+import domtoimage from 'utils/dom-to-image';
 import {
   Blob,
   URL,
@@ -47,8 +47,8 @@ export function calculateExportImageSize({width, height, ratio, resolution}) {
   };
 }
 
-export function convertToPng(sourceElem) {
-  return domtoimage.toPng(sourceElem);
+export function convertToPng(sourceElem, options) {
+  return domtoimage.toPng(sourceElem, options);
 }
 
 export function dataURItoBlob(dataURI) {

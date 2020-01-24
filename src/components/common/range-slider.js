@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import React, {Component} from 'react';
+import React, {Component, createRef} from 'react';
 import PropTypes from 'prop-types';
 import styled from 'styled-components';
 
@@ -28,9 +28,9 @@ import {Input} from 'components/common/styled-components';
 
 import {roundValToStep} from 'utils/data-utils';
 
-const SliderInput = Input.extend`
-  height: 24px;
-  width: 40px;
+const SliderInput = styled(Input)`
+  height: ${props => props.theme.sliderInputHeight}px;
+  width: ${props => props.theme.sliderInputWidth}px;
   padding: 4px 6px;
   margin-left: ${props => props.flush ? 0 : 24}px;
 `;
@@ -40,7 +40,7 @@ const SliderWrapper = styled.div`
   position: relative;
 `;
 
-const RangeInputWrapper =styled.div`
+const RangeInputWrapper = styled.div`
   margin-top: 6px;
   display: flex;
   justify-content: space-between;
@@ -84,6 +84,10 @@ export default class RangeSlider extends Component {
   componentDidUpdate() {
     this._resize();
   }
+
+  sliderContainer = createRef();
+  inputValue0 = createRef();
+  inputValue1 = createRef();
 
   _setValueFromProps = props => {
     const {value0, value1} = props;
@@ -134,7 +138,7 @@ export default class RangeSlider extends Component {
   };
 
   _resize() {
-    const width = this.sliderContainer.offsetWidth;
+    const width = this.sliderContainer.current.offsetWidth;
     if (width !== this.state.width) {
       this.setState({width});
     }
@@ -142,6 +146,7 @@ export default class RangeSlider extends Component {
 
   _renderInput(key) {
     const setRange = key === 'value0' ? this._setRangeVal0 : this._setRangeVal1;
+    const ref = key === 'value0' ? this.inputValue0 : this.inputValue1;
     const update = e => {
       if (!setRange(e.target.value)) {
         this.setState({[key]: this.state[key]});
@@ -152,10 +157,9 @@ export default class RangeSlider extends Component {
       <SliderInput
         className="kg-range-slider__input"
         type="number"
-        innerRef={comp => {
-          this[`input-${key}`] = comp;
-        }}
-        id={`filter-${key}`}
+        ref={ref}
+        id={`slider-input-${key}`}
+        key={key}
         value={this.state[key]}
         onChange={e => {
           this.setState({[key]: e.target.value});
@@ -163,7 +167,7 @@ export default class RangeSlider extends Component {
         onKeyPress={e => {
           if (e.key === 'Enter') {
             update(e);
-            this[`input-${key}`].blur();
+            ref.current.blur();
           }
         }}
         onBlur={update}
@@ -185,19 +189,19 @@ export default class RangeSlider extends Component {
       onChange,
       value0,
       value1,
-      sliderHandleWidth
+      sliderHandleWidth,
+      step
     } = this.props;
 
-    const height = this.props.xAxis ? '24px' : '16px';
+    const height = isRanged && showInput ? '16px' : '24px';
     const {width} = this.state;
     const plotWidth =  width - sliderHandleWidth;
 
     return (
       <div
         className="kg-range-slider" style={{width: '100%', padding: `0 ${sliderHandleWidth / 2}px`}}
-        ref={comp => {
-          this.sliderContainer = comp;
-        }}>
+        ref={this.sliderContainer}
+      >
         {histogram && histogram.length ? (
           <RangePlot
             histogram={histogram}
@@ -226,16 +230,12 @@ export default class RangeSlider extends Component {
             maxValue={range[1]}
             value0={value0}
             value1={value1}
+            step={step}
             handleWidth={sliderHandleWidth}
             onSlider0Change={this._setRangeVal0}
             onSlider1Change={this._setRangeVal1}
             onSliderBarChange={(val0, val1) => {
-              if (this._isVal1InRange(val1) && this._isVal0InRange(val0)) {
-                onChange([
-                  this._roundValToStep(val0),
-                  this._roundValToStep(val1)
-                ]);
-              }
+              onChange([val0, val1]);
             }}
             enableBarDrag
           />

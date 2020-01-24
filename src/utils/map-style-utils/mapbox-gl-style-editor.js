@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,8 +18,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import Immutable from 'immutable';
 import memoize from 'lodash.memoize';
+import clondDeep from 'lodash.clonedeep';
 import {
   DEFAULT_LAYER_GROUPS,
   RESOLUTIONS,
@@ -47,7 +47,7 @@ const resolver = ({id, mapStyle, visibleLayerGroups = {}}) =>
  *
  * @param {object} mapStyle - preset map style
  * @param {object} visibleLayerGroups - visible layers of top map
- * @returns {Immutable.Map} top map style
+ * @returns {object} top map style
  */
 export const editTopMapStyle = memoize(({id, mapStyle, visibleLayerGroups}) => {
   const visibleFilters = (mapStyle.layerGroups || [])
@@ -60,10 +60,10 @@ export const editTopMapStyle = memoize(({id, mapStyle, visibleLayerGroups}) => {
     visibleFilters.some(match => match(layer))
   );
 
-  return Immutable.fromJS({
+  return {
     ...mapStyle.style,
     layers: filteredLayers
-  });
+  };
 }, resolver);
 
 /**
@@ -71,7 +71,7 @@ export const editTopMapStyle = memoize(({id, mapStyle, visibleLayerGroups}) => {
  *
  * @param {object} mapStyle - preset map style
  * @param {object} visibleLayerGroups - visible layers of bottom map
- * @returns {Immutable.Map} bottom map style
+ * @returns {object} bottom map style
  */
 export const editBottomMapStyle = memoize(
   ({id, mapStyle, visibleLayerGroups}) => {
@@ -86,17 +86,17 @@ export const editBottomMapStyle = memoize(
     );
 
     // console.log(filteredLayers)
-    return Immutable.fromJS({
+    return {
       ...mapStyle.style,
       layers: filteredLayers
-    });
+    };
   },
   resolver
 );
 
 const mapUrlRg = /^mapbox:\/\/styles\/[-a-z0-9]{2,256}\/[-a-z0-9]{2,256}/;
 const httpRg = /^(?=(http:|https:))/;
-const mapboxStyleApiUrl = 'https://api.mapbox.com/styles/v1/';
+const defaultMapboxApiUrl = 'https://api.mapbox.com';
 
 // valid style url
 // mapbox://styles/uberdata/cjfyl03kp1tul2smf5v2tbdd4
@@ -105,7 +105,7 @@ export function isValidStyleUrl(url) {
   return typeof url === 'string' && Boolean(url.match(mapUrlRg) || url.match(httpRg));
 }
 
-export function getStyleDownloadUrl(styleUrl, accessToken) {
+export function getStyleDownloadUrl(styleUrl, accessToken, mapboxApiUrl) {
   if (styleUrl.startsWith('http')) {
     return styleUrl;
   }
@@ -115,7 +115,7 @@ export function getStyleDownloadUrl(styleUrl, accessToken) {
     const styleId = styleUrl.replace('mapbox://styles/', '');
 
     // https://api.mapbox.com/styles/v1/heshan0131/cjg1bfumo1cwm2rlrjxkinfgw?pluginName=Keplergl&access_token=<token>
-    return `${mapboxStyleApiUrl}${styleId}?pluginName=Keplergl&access_token=${accessToken}`
+    return `${mapboxApiUrl || defaultMapboxApiUrl}/styles/v1/${styleId}?pluginName=Keplergl&access_token=${accessToken}`
   }
 
   // style url not recognized
@@ -130,7 +130,7 @@ export function scaleMapStyleByResolution(mapboxStyle, resolution) {
     const {scale, zoomOffset} = RESOLUTION_OPTIONS.find(
       r => r.id === resolution
     );
-    const copyStyle = mapboxStyle.toJS();
+    const copyStyle = clondDeep(mapboxStyle);
     (copyStyle.layers || []).forEach(d => {
       // edit minzoom and maxzoom
       if (d.maxzoom) {
@@ -158,7 +158,7 @@ export function scaleMapStyleByResolution(mapboxStyle, resolution) {
       }
     });
 
-    return Immutable.fromJS(copyStyle);
+    return copyStyle;
   }
 
   return mapboxStyle;

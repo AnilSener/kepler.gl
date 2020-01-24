@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -35,7 +35,7 @@ import {
 
 import {
   savedConfigV0 as savedConfig2,
-  parsecConfigV0 as parsedConfig2
+  parsedConfigV0 as parsedConfig2
 } from 'test/fixtures/config_v0_geojson_point';
 
 import {

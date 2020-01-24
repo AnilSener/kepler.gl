@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -46,8 +46,8 @@ test('#GeojsonLayer -> constructor', t => {
   t.end();
 });
 
-test('#GeojsonLayer -> formatLayerData', async t => {
-  const {rows} = await processCsvData(wktCsv);
+test('#GeojsonLayer -> formatLayerData', t => {
+  const {rows} = processCsvData(wktCsv);
 
   const filteredIndex = [0, 2, 4];
   const data = [rows[0], rows[2], rows[4]];

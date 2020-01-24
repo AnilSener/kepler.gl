@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,20 +23,23 @@ import React, {Component} from 'react';
 import PropTypes from 'prop-types';
 import MapboxGLMap from 'react-map-gl';
 import DeckGL from 'deck.gl';
-import {GL} from 'luma.gl';
+import {createSelector} from 'reselect';
 
 // components
-import MapPopoverFactory from 'components/map/map-popover';
+import MapTooltipFactory from 'components/map/map-tooltip';
 import MapControlFactory from 'components/map/map-control';
 import {StyledMapContainer} from 'components/common/styled-components';
 
-// Overlay type
-import {generateMapboxLayers, updateMapboxLayers} from '../layers/mapbox-utils';
+import Draw from './editor';
 
+// utils
+import {generateMapboxLayers, updateMapboxLayers} from 'layers/mapbox-utils';
+import {OVERLAY_TYPE} from 'layers/base-layer';
+import {onWebGLInitialized, setLayerBlending} from 'utils/gl-utils';
 import {transformRequest} from 'utils/map-style-utils/mapbox-utils';
 
 // default-settings
-import {LAYER_BLENDINGS} from 'constants/default-settings';
+import ThreeDBuildingLayer from 'deckgl-layers/3d-building-layer/3d-building-layer';
 
 const MAP_STYLE = {
   container: {
@@ -48,13 +51,16 @@ const MAP_STYLE = {
   }
 };
 
-const getGlConst = d => GL[d];
-
 const MAPBOXGL_STYLE_UPDATE = 'style.load';
-MapContainerFactory.deps = [
-  MapPopoverFactory, MapControlFactory];
+const MAPBOXGL_RENDER = 'render';
+const TRANSITION_DURATION = 0;
 
-export default function MapContainerFactory(MapPopover, MapControl) {
+MapContainerFactory.deps = [
+  MapTooltipFactory,
+  MapControlFactory
+];
+
+export default function MapContainerFactory(MapTooltip, MapControl) {
   class MapContainer extends Component {
     static propTypes = {
       // required
@@ -65,12 +71,15 @@ export default function MapContainerFactory(MapPopover, MapControl) {
       layerData: PropTypes.arrayOf(PropTypes.any).isRequired,
       layers: PropTypes.arrayOf(PropTypes.any).isRequired,
       mapState: PropTypes.object.isRequired,
+      uiState: PropTypes.object.isRequired,
       mapStyle: PropTypes.object.isRequired,
       mapControls: PropTypes.object.isRequired,
+      mousePos: PropTypes.object.isRequired,
       mapboxApiAccessToken: PropTypes.string.isRequired,
-      toggleMapControl: PropTypes.func.isRequired,
+      mapboxApiUrl: PropTypes.string,
       visStateActions: PropTypes.object.isRequired,
       mapStateActions: PropTypes.object.isRequired,
+      uiStateActions: PropTypes.object.isRequired,
 
       // optional
       isExport: PropTypes.bool,
@@ -79,47 +88,60 @@ export default function MapContainerFactory(MapPopover, MapControl) {
       mapLayers: PropTypes.object,
       onMapToggleLayer: PropTypes.func,
       onMapStyleLoaded: PropTypes.func,
-      onMapRender: PropTypes.func
+      onMapRender: PropTypes.func,
+      getMapboxRef: PropTypes.func
     };
 
     static defaultProps = {
-      MapComponent: MapboxGLMap
+      MapComponent: MapboxGLMap,
+      deckGlProps: {}
     };
 
     constructor(props) {
       super(props);
-      this.state = {
-        reRenderKey: 0,
-        gl: null,
-        mousePosition: [0, 0]
-      };
+
       this.previousLayers = {
         // [layers.id]: mapboxLayerConfig
       };
-    }
-
-    componentWillReceiveProps(nextProps) {
-      if (
-        this.props.mapState.dragRotate !== nextProps.mapState.dragRotate ||
-        this.props.layerBlending !== nextProps.layerBlending
-      ) {
-        // increment rerender key to force gl reinitialize when
-        // perspective or layer blending changed
-        // TODO: layer blending can now be implemented per layer base
-        this.setState({
-          reRenderKey: this.state.reRenderKey + 1
-        });
-      }
     }
 
     componentWillUnmount() {
       // unbind mapboxgl event listener
       if (this._map) {
         this._map.off(MAPBOXGL_STYLE_UPDATE);
+        this._map.off(MAPBOXGL_RENDER);
       }
     }
 
+    layersSelector = props => props.layers;
+    layerDataSelector = props => props.layerData;
+    mapLayersSelector = props => props.mapLayers;
+    layerOrderSelector = props => props.layerOrder;
+    layersToRenderSelector = createSelector(
+      this.layersSelector,
+      this.layerDataSelector,
+      this.mapLayersSelector,
+      // {[id]: true \ false}
+      (layers, layerData, mapLayers) => layers.reduce((accu, layer, idx) => ({
+        ...accu,
+        [layer.id]: layer.shouldRenderLayer(layerData[idx]) &&
+          this._isVisibleMapLayer(layer, mapLayers)
+      }), {})
+    );
+
+    mapboxLayersSelector = createSelector(
+      this.layersSelector,
+      this.layerDataSelector,
+      this.layerOrderSelector,
+      this.layersToRenderSelector,
+      generateMapboxLayers
+    );
+
     /* component private functions */
+    _isVisibleMapLayer(layer, mapLayers) {
+      // if layer.id is not in mapLayers, don't render it
+      return !mapLayers || (mapLayers && mapLayers[layer.id]);
+    }
 
     _onCloseMapPopover = () => {
       this.props.visStateActions.onLayerClick(null);
@@ -131,175 +153,58 @@ export default function MapContainerFactory(MapPopover, MapControl) {
       });
     };
 
-    _onWebGLInitialized = gl => {
-      // enable depth test for perspective mode
-      if (this.props.mapState.dragRotate) {
-        gl.enable(gl.DEPTH_TEST);
-        gl.depthFunc(gl.LEQUAL);
-      } else {
-        gl.disable(gl.DEPTH_TEST);
-      }
-
-      // allow Uint32 indices in building layer
-      gl.getExtension('OES_element_index_uint');
-
-      this._togglelayerBlending(gl);
-
-      this.setState({gl});
-    };
-
-    _onMouseMove = evt => {
-      const {interactionConfig: {brush}} = this.props;
-
-      if (evt.nativeEvent && brush.enabled) {
-        this.setState({
-          mousePosition: [evt.nativeEvent.offsetX, evt.nativeEvent.offsetY]
-        });
-      }
-    };
+    _onWebGLInitialized = onWebGLInitialized;
 
     _handleMapToggleLayer = layerId => {
       const {index: mapIndex = 0, visStateActions} = this.props;
       visStateActions.toggleLayerForMap(mapIndex, layerId);
     };
 
-    _setMapboxMap = (mapbox) => {
+    _onMapboxStyleUpdate = () => {
+      // force refresh mapboxgl layers
+      this.previousLayers = {};
+      this._updateMapboxLayers();
+
+      if (typeof this.props.onMapStyleLoaded === 'function') {
+        this.props.onMapStyleLoaded(this._map);
+      }
+    };
+
+    _setMapboxMap = mapbox => {
       if (!this._map && mapbox) {
+
         this._map = mapbox.getMap();
+        // i noticed in certain context we don't access the actual map element
+        if (!this._map) {
+          return;
+        }
         // bind mapboxgl event listener
-        this._map.on(MAPBOXGL_STYLE_UPDATE, () => {
-          // force refresh mapboxgl layers
+        this._map.on(MAPBOXGL_STYLE_UPDATE, this._onMapboxStyleUpdate);
 
-          updateMapboxLayers(
-            this._map,
-            this._renderMapboxLayers(),
-            this.previousLayers,
-            this.props.mapLayers,
-            {force: true}
-          );
+        this._map.on(MAPBOXGL_RENDER, () => {
 
-          if (typeof this.props.onMapStyleLoaded === 'function') {
-            this.props.onMapStyleLoaded(this._map);
-          }
-        });
-
-        this._map.on('render', () => {
           if (typeof this.props.onMapRender === 'function') {
             this.props.onMapRender(this._map);
           }
         });
       }
-    }
 
-    /* deck.gl doesn't support blendFuncSeparate yet
-     * so we're applying the blending ourselves
-    */
-    _togglelayerBlending = gl => {
-      const blending = LAYER_BLENDINGS[this.props.layerBlending];
-      const {
-        enable,
-        blendFunc,
-        blendEquation,
-        blendFuncSeparate,
-        blendEquationSeparate
-      } = blending;
-
-      if (enable) {
-        gl.enable(GL.BLEND);
-        if (blendFunc) {
-          gl.blendFunc(...blendFunc.map(getGlConst));
-          gl.blendEquation(GL[blendEquation]);
-        } else {
-          gl.blendFuncSeparate(...blendFuncSeparate.map(getGlConst));
-          gl.blendEquationSeparate(...blendEquationSeparate.map(getGlConst));
-        }
-      } else {
-        gl.disable(GL.BLEND);
+      if (this.props.getMapboxRef) {
+        // The parent component can gain access to our MapboxGlMap by
+        // providing this callback. Note that 'mapbox' will be null when the
+        // ref is unset (e.g. when a split map is closed).
+        this.props.getMapboxRef(mapbox, this.props.index);
       }
     };
 
+    _onBeforeRender = ({gl}) => {
+      setLayerBlending(gl, this.props.layerBlending);
+    };
+
     /* component render functions */
-
-    /* eslint-disable complexity */
-    _renderObjectLayerPopover() {
-      // TODO: move this into reducer so it can be tested
-      const {
-        mapState,
-        hoverInfo,
-        clicked,
-        datasets,
-        interactionConfig,
-        layers,
-        mapLayers
-      } = this.props;
-
-      // if clicked something, ignore hover behavior
-      const objectInfo = clicked || hoverInfo;
-      if (
-        !interactionConfig.tooltip.enabled ||
-        !objectInfo ||
-        !objectInfo.picked
-      ) {
-        // nothing hovered
-        return null;
-      }
-
-      const {lngLat, object, layer: overlay} = objectInfo;
-
-      // deckgl layer to kepler-gl layer
-      const layer = layers[overlay.props.idx];
-
-      if (
-        !layer ||
-        !layer.config.isVisible ||
-        !object ||
-        !layer.getHoverData ||
-        (mapLayers && !mapLayers[layer.id].isVisible)
-      ) {
-        // layer is not visible
-        return null;
-      }
-
-      const {config: {dataId}} = layer;
-      const {allData, fields} = datasets[dataId];
-      const data = layer.getHoverData(object, allData);
-
-      // project lnglat to screen so that tooltip follows the object on zoom
-      const {viewport} = overlay.context;
-      const {x, y} = this._getHoverXY(viewport, lngLat) || objectInfo;
-
-      const popoverProps = {
-        data,
-        fields,
-        fieldsToShow: interactionConfig.tooltip.config.fieldsToShow[dataId],
-        layer,
-        isVisible: true,
-        x,
-        y,
-        freezed: Boolean(clicked),
-        onClose: this._onCloseMapPopover,
-        mapState
-      };
-
-      return (
-        <div>
-          <MapPopover {...popoverProps} />
-        </div>
-      );
-    }
-
-    /* eslint-enable complexity */
-
     _getHoverXY(viewport, lngLat) {
       const screenCoord = !viewport || !lngLat ? null : viewport.project(lngLat);
-
       return screenCoord && {x: screenCoord[0], y: screenCoord[1]};
-    }
-
-    _shouldRenderLayer(layer, data, mapLayers) {
-      const isAvailableAndVisible =
-        !(mapLayers && mapLayers[layer.id]) || mapLayers[layer.id].isVisible;
-      return layer.shouldRenderLayer(data) && isAvailableAndVisible;
     }
 
     _renderLayer = (overlays, idx) => {
@@ -308,19 +213,16 @@ export default function MapContainerFactory(MapPopover, MapControl) {
         layerData,
         hoverInfo,
         clicked,
-        mapLayers,
         mapState,
-        visStateActions,
-        interactionConfig
+        interactionConfig,
+        mousePos
       } = this.props;
-      const {mousePosition} = this.state;
       const layer = layers[idx];
       const data = layerData[idx];
 
       const layerInteraction = {
-        onHover: visStateActions.onLayerHover,
-        onClick: visStateActions.onLayerClick,
-        mousePosition
+        mousePosition: mousePos.mousePosition,
+        wrapLongitude: true
       };
 
       const objectHovered = clicked || hoverInfo;
@@ -328,152 +230,204 @@ export default function MapContainerFactory(MapPopover, MapControl) {
         onSetLayerDomain: val => this._onLayerSetDomain(idx, val)
       };
 
-      if (!this._shouldRenderLayer(layer, data, mapLayers)) {
-        return overlays;
-      }
-
-      let layerOverlay = [];
-
       // Layer is Layer class
-      if (typeof layer.renderLayer === 'function') {
-        layerOverlay = layer.renderLayer({
-          data,
-          idx,
-          layerInteraction,
-          objectHovered,
-          mapState,
-          interactionConfig,
-          layerCallbacks
-        });
-      }
+      const layerOverlay = layer.renderLayer({
+        data,
+        idx,
+        layerInteraction,
+        objectHovered,
+        mapState,
+        interactionConfig,
+        layerCallbacks
+      });
 
-      if (layerOverlay.length) {
-        overlays = overlays.concat(layerOverlay);
-      }
-      return overlays;
+      return overlays.concat(layerOverlay || []);
     };
 
-    _renderOverlay() {
+    _renderDeckOverlay(layersToRender) {
       const {
         mapState,
+        mapStyle,
         layerData,
-        layerOrder
+        layerOrder,
+        layers,
+        visStateActions,
+        mapboxApiAccessToken,
+        mapboxApiUrl,
+        uiState
       } = this.props;
 
       let deckGlLayers = [];
-
       // wait until data is ready before render data layers
       if (layerData && layerData.length) {
         // last layer render first
         deckGlLayers = layerOrder
           .slice()
           .reverse()
+          .filter(idx => layers[idx].overlayType === OVERLAY_TYPE.deckgl && layersToRender[layers[idx].id])
           .reduce(this._renderLayer, []);
       }
 
+      if (mapStyle.visibleLayerGroups['3d building']) {
+        deckGlLayers.push(new ThreeDBuildingLayer({
+          id: '_keplergl_3d-building',
+          mapboxApiAccessToken,
+          mapboxApiUrl,
+          threeDBuildingColor: mapStyle.threeDBuildingColor,
+          updateTriggers: {
+            getFillColor:  mapStyle.threeDBuildingColor
+          }
+        }));
+      }
+
+      const isEdit = uiState.mapControls.mapDraw.active;
+
       return (
         <DeckGL
-          {...mapState}
+          {...this.props.deckGlProps}
+          viewState={mapState}
           id="default-deckgl-overlay"
           layers={deckGlLayers}
-          key={this.state.reRenderKey}
           onWebGLInitialized={this._onWebGLInitialized}
+          onBeforeRender={this._onBeforeRender}
+          onHover={visStateActions.onLayerHover}
+          onClick={visStateActions.onLayerClick}
+          style={{zIndex: isEdit ? -1 : 0}}
         />
       );
     }
 
-    _renderMapboxLayers() {
-      const {
-        layers,
-        layerData,
-        layerOrder
-      } = this.props;
+    _updateMapboxLayers() {
+      const mapboxLayers = this.mapboxLayersSelector(this.props);
+      if (!Object.keys(mapboxLayers).length && !Object.keys(this.previousLayers).length) {
+        return;
+      }
 
-      return generateMapboxLayers(layers, layerData, layerOrder);
+      updateMapboxLayers(
+        this._map,
+        mapboxLayers,
+        this.previousLayers
+      );
+
+      this.previousLayers = mapboxLayers;
     }
 
     _renderMapboxOverlays() {
       if (this._map && this._map.isStyleLoaded()) {
-
-        const mapboxLayers = this._renderMapboxLayers();
-
-        updateMapboxLayers(
-          this._map,
-          mapboxLayers,
-          this.previousLayers,
-          this.props.mapLayers
-        );
-
-        this.previousLayers = mapboxLayers.reduce((final, layer) => ({
-          ...final,
-          [layer.id]: layer.config
-        }), {})
+        this._updateMapboxLayers();
       }
     }
 
-    render() {
-      const {mapState, mapStyle, mapStateActions} = this.props;
-      const {updateMap, onMapClick} = mapStateActions;
+    _onViewportChange = (viewState) => {
+      if (typeof this.props.onViewStateChange === 'function') {
+        this.props.onViewStateChange(viewState);
+      }
+      this.props.mapStateActions.updateMap(viewState);
+    };
 
+    render() {
+      const {
+        mapState, mapStyle, mapStateActions, mapLayers, layers, MapComponent,
+        datasets, mapboxApiAccessToken, mapboxApiUrl, mapControls,
+        uiState, uiStateActions, editor, visStateActions,
+        hoverInfo, clicked, interactionConfig,
+        mousePos
+      } = this.props;
+      const layersToRender = this.layersToRenderSelector(this.props);
       if (!mapStyle.bottomMapStyle) {
         // style not yet loaded
         return <div/>;
       }
 
-      const {mapLayers, layers, datasets, mapboxApiAccessToken,
-        mapControls, toggleMapControl} = this.props;
-
       const mapProps = {
         ...mapState,
         preserveDrawingBuffer: true,
         mapboxApiAccessToken,
-        onViewportChange: updateMap,
+        mapboxApiUrl,
+        onViewportChange: this._onViewportChange,
         transformRequest
       };
 
+      const isEdit = uiState.mapControls.mapDraw.active;
+
       return (
-        <StyledMapContainer style={MAP_STYLE.container} onMouseMove={this._onMouseMove}>
+        <StyledMapContainer style={MAP_STYLE.container}>
           <MapControl
             datasets={datasets}
             dragRotate={mapState.dragRotate}
-            isSplit={mapState.isSplit}
+            isSplit={Boolean(mapLayers)}
             isExport={this.props.isExport}
             layers={layers}
+            layersToRender={layersToRender}
             mapIndex={this.props.index}
-            mapLayers={mapLayers}
             mapControls={mapControls}
             scale={mapState.scale || 1}
             top={0}
+            editor={uiState.editor}
             onTogglePerspective={mapStateActions.togglePerspective}
             onToggleSplitMap={mapStateActions.toggleSplitMap}
             onMapToggleLayer={this._handleMapToggleLayer}
-            onToggleFullScreen={mapStateActions.toggleFullScreen}
-            onToggleMapControl={toggleMapControl}
+            onToggleMapControl={uiStateActions.toggleMapControl}
+            onSetEditorMode={uiStateActions.setEditorMode}
           />
-          <this.props.MapComponent
-            {...mapProps}
-            key="bottom"
-            ref={this._setMapboxMap}
-            mapStyle={mapStyle.bottomMapStyle}
-            onClick={onMapClick}
-          >
-            {this._renderOverlay()}
-            {this._renderMapboxOverlays()}
-          </this.props.MapComponent>
+          <div>
+            <MapComponent
+              {...mapProps}
+              key="bottom"
+              ref={this._setMapboxMap}
+              mapStyle={mapStyle.bottomMapStyle}
+              getCursor={this.props.hoverInfo ? () => 'pointer' : undefined}
+              transitionDuration={TRANSITION_DURATION}
+              onMouseMove={this.props.visStateActions.onMouseMove}
+            >
+              {this._renderDeckOverlay(layersToRender)}
+              {this._renderMapboxOverlays(layersToRender)}
+              {/*
+                By placing the editor in this map we have to perform fewer checks for css zIndex
+                and fewer updates when we switch from edit to read mode
+              */}
+              <Draw
+                datasets={datasets}
+                editor={uiState.editor}
+                features={editor.features}
+                isEnabled={isEdit}
+                layers={layers}
+                onDeleteFeature={uiStateActions.deleteFeature}
+                onSelect={uiStateActions.setSelectedFeature}
+                onUpdate={visStateActions.setFeatures}
+                style={{zIndex: isEdit ? 0 : -1}}
+                onToggleFeatureLayer={visStateActions.toggleFeatureLayer}
+              />
+            </MapComponent>
+          </div>
           {mapStyle.topMapStyle && (
             <div style={MAP_STYLE.top}>
-              <this.props.MapComponent
+              <MapComponent
                 {...mapProps}
                 key="top"
                 mapStyle={mapStyle.topMapStyle}
               />
             </div>
           )}
-          {this._renderObjectLayerPopover()}
+          <MapTooltip
+            clicked={clicked}
+            datasets={datasets}
+            getHoverXY={this._getHoverXY}
+            hoverInfo={hoverInfo}
+            interactionConfig={interactionConfig}
+            layers={layers}
+            layersToRender={layersToRender}
+            mapLayers={mapLayers}
+            mapState={mapState}
+            mousePos={mousePos}
+            onClose={this._onCloseMapPopover}
+          />
         </StyledMapContainer>
       );
     }
   }
+
+  MapContainer.displayName = 'MapContainer';
 
   return MapContainer;
 }

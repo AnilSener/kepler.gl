@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -163,11 +163,11 @@ export default class TimeRangeSlider extends Component {
 
 const TimeValueWrapper = styled.div`
   display: flex;
-  height: ${props => props.theme.secondaryInputHeight};
+  height: 32px;
   align-items: center;
   font-size: 11px;
   justify-content: ${props => props.isEnlarged ? 'center' : 'space-between'};
-  color: ${props => props.theme.labelColor};
+  color: ${props => props.theme.textColorHl};
 
   .horizontal-bar {
     padding: 0 12px;
@@ -218,7 +218,7 @@ const StyledAnimationControls = styled.div`
   }
 `;
 
-const IconButton = Button.extend`
+const IconButton = styled(Button)`
   svg {
     margin: 0 6px;
   }

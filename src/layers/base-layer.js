@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,15 +34,16 @@ import {
   CHANNEL_SCALE_SUPPORTED_FIELDS
 } from 'constants/default-settings';
 import {DataVizColors} from 'constants/custom-color-ranges';
-import {LAYER_VIS_CONFIGS} from './layer-factory';
+import {LAYER_VIS_CONFIGS, DEFAULT_TEXT_LABEL} from './layer-factory';
 
-import {generateHashId, notNullorUndefined, isPlainObject} from 'utils/utils';
+import {generateHashId, isPlainObject} from 'utils/utils';
 
 import {
   getSampleData,
   getLatLngBounds,
   maybeToDate,
-  getSortingFunction
+  getSortingFunction,
+  notNullorUndefined
 } from 'utils/data-utils';
 
 import {
@@ -62,7 +63,7 @@ export const OVERLAY_TYPE = keymirror({
   mapboxgl: null
 });
 
-const layerColors = Object.values(DataVizColors).map(hexToRgb);
+export const layerColors = Object.values(DataVizColors).map(hexToRgb);
 function* generateColor() {
   let index = 0;
   while (index < layerColors.length + 1) {
@@ -73,7 +74,7 @@ function* generateColor() {
   }
 }
 
-const colorMaker = generateColor();
+export const colorMaker = generateColor();
 const defaultGetFieldValue = (field, d) => d[field.tableFieldIndex - 1];
 
 export default class Layer {
@@ -177,6 +178,21 @@ export default class Layer {
     };
   }
 
+  /**
+   * Return a React component for to render layer instructions in a modal
+   * @returns {object} - an object
+   * @example
+   *  return {
+   *    id: 'iconInfo',
+   *    template: IconInfoModal,
+   *    modalProps: {
+   *      title: 'How to draw icons'
+   *   };
+   * }
+   */
+  get layerInfoModal() {
+    return null;
+  }
   /*
    * Given a dataset, automatically create layers based on it
    * and return the props
@@ -269,7 +285,7 @@ export default class Layer {
       columns: props.columns || null,
       isVisible: props.isVisible || false,
       isConfigActive: props.isConfigActive || false,
-      highlightColor: props.highlightColor || [252, 242, 26],
+      highlightColor: props.highlightColor || [252, 242, 26, 255],
 
       // TODO: refactor this into separate visual Channel config
       // color by field, domain is set by filters, field, scale type
@@ -282,7 +298,9 @@ export default class Layer {
       sizeScale: 'linear',
       sizeField: null,
 
-      visConfig: {}
+      visConfig: {},
+
+      textLabel: [DEFAULT_TEXT_LABEL]
     };
   }
 
@@ -397,7 +415,7 @@ export default class Layer {
     const notToDeepMerge = Object.values(this.visualChannels).map(v => v.field);
 
     // don't deep merge color range, reversed: is not a key by default
-    notToDeepMerge.push('colorRange');
+    notToDeepMerge.push('colorRange', 'strokeColorRange');
 
     // don't copy over domain
     const notToCopy = Object.values(this.visualChannels).map(v => v.domain);
@@ -467,7 +485,7 @@ export default class Layer {
           LAYER_VIS_CONFIGS[layerVisConfigs[item]].defaultValue;
         this.visConfigSettings[item] = LAYER_VIS_CONFIGS[layerVisConfigs[item]];
       } else if (
-        ['type', 'defaultValue'].every(p => layerVisConfigs[item][p])
+        ['type', 'defaultValue'].every(p => layerVisConfigs[item].hasOwnProperty(p))
       ) {
         // if provided customized visConfig, and has type && defaultValue
         // TODO: further check if customized visConfig is valid
@@ -543,9 +561,10 @@ export default class Layer {
   shouldRenderLayer(data) {
     return (
       this.type &&
-      this.hasAllColumns() &&
       this.config.isVisible &&
-      this.hasLayerData(data)
+      this.hasAllColumns() &&
+      this.hasLayerData(data) &&
+      typeof this.renderLayer === 'function'
     );
   }
 
@@ -592,11 +611,16 @@ export default class Layer {
     scale,
     data,
     field,
-    defaultValue = NO_VALUE_COLOR,
+    nullValue = NO_VALUE_COLOR,
     getValue = defaultGetFieldValue
   ) {
     const {type} = field;
     const value = getValue(field, data);
+
+    if (!notNullorUndefined(value)) {
+      return nullValue;
+    }
+
     let attributeValue;
     if (type === ALL_FIELD_TYPES.timestamp) {
       // shouldn't need to convert here
@@ -606,8 +630,8 @@ export default class Layer {
       attributeValue = scale(value);
     }
 
-    if (!attributeValue) {
-      attributeValue = defaultValue;
+    if (!notNullorUndefined(attributeValue)) {
+      attributeValue = nullValue;
     }
 
     return attributeValue;

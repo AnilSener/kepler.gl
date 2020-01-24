@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -68,7 +68,7 @@ export const secondaryBtnBgdHover = '#A0A7B4';
 export const linkBtnBgd = 'transparent';
 export const linkBtnActBgd = linkBtnBgd;
 export const linkBtnColor = '#A0A7B4';
-export const linkBtnActColor = '#3A414C';
+export const linkBtnActColor = textColorHlLT;
 export const linkBtnActBgdHover = linkBtnBgd;
 
 export const negativeBtnBgd = errorColor;
@@ -183,8 +183,12 @@ export const tooltipColor = '#333334';
 // Modal
 export const modalTitleColor = '#3A414C';
 export const modalTitleFontSize = '24px';
+export const modalTitleFontSizeSmaller = '18px';
 export const modalFooterBgd = '#F8F8F9';
 export const modalImagePlaceHolder = '#DDDFE3';
+export const modalPadding = '10px 0';
+export const modalLateralPadding = '72px';
+export const modalPortableLateralPadding = '36px';
 
 // Modal Dialog (Dark)
 export const modalDialogBgd = '#3A414C';
@@ -195,15 +199,44 @@ export const sliderBarColor = '#6A7485';
 export const sliderBarBgd = '#3A414C';
 export const sliderBarHoverColor = '#D3D8E0';
 export const sliderBarRadius = '1px';
-export const sliderBarHeight = '4px';
-export const sliderHandleHeight = '12px';
-export const sliderHandleWidth = '12px';
+export const sliderBarHeight = 4;
+export const sliderHandleHeight = 12;
+export const sliderHandleWidth = 12;
 export const sliderHandleColor = '#D3D8E0';
 export const sliderHandleHoverColor = '#FFFFFF';
 export const sliderHandleShadow = '0 2px 4px 0 rgba(0,0,0,0.40)';
+export const sliderInputHeight = 24;
+export const sliderInputWidth = 50;
 
 // Plot
 export const rangeBrushBgd = '#3A414C';
+export const histogramFillInRange = activeColor;
+export const histogramFillOutRange = sliderBarColor;
+
+// Notification
+export const notificationColors = {
+  info: '#276ef1',
+  error: '#f25138',
+  success: '#47b275',
+  warning: '#ffc043'
+};
+
+export const notificationPanelWidth = 240;
+export const notificationPanelItemWidth = notificationPanelWidth - 60;
+export const notificationPanelItemHeight = 60;
+
+// Datagrid
+const columnWidth = 200;
+const cellHeaderHeight = 72;
+const cellHeight = 48;
+const extendCellHeight = 2 * cellHeight;
+const extendColumnWidth = 2 * columnWidth;
+const gridDefaultWidth = 800;
+const gridDefaultHeight = 600;
+
+// Action Panel
+export const actionPanelWidth = 110;
+export const actionPanelHeight = 32;
 
 export const textTruncate = {
   maxWidth: '100%',
@@ -211,6 +244,12 @@ export const textTruncate = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   wordWrap: 'normal'
+};
+
+// This breakpoints are used for responsive design
+export const breakPoints = {
+  palm: 588,
+  desk: 768
 };
 
 // theme is passed to kepler.gl when it's mounted,
@@ -277,7 +316,7 @@ const input = css`
 
 const inputLT = css`
   ${input}
-  
+
   background-color: ${props => props.theme.selectBackgroundLT};
   border: 1px solid
   ${props =>
@@ -313,7 +352,7 @@ const inputLT = css`
 `;
 
 const secondaryInput = css`
-  ${props => props.theme.input} 
+  ${props => props.theme.input}
   color: ${props => props.theme.secondaryInputColor};
   background-color: ${props => props.theme.secondaryInputBgd};
   height: ${props => props.theme.secondaryInputHeight};
@@ -335,15 +374,29 @@ const secondaryInput = css`
   }
 `;
 
-const chickletedInput = css`
-  ${props => props.theme.secondaryInput} 
+const chickletedInputContainer = css`
   cursor: pointer;
   flex-wrap: wrap;
   height: auto;
   justify-content: start;
   margin-bottom: 2px;
-  padding: 4px 7px 4px 4px;
+  padding: 0px 7px 0px 4px;
   white-space: normal;
+
+  .chickleted-input__placeholder {
+    line-height: 24px;
+    margin: 4px;
+  }
+`;
+
+const chickletedInput = css`
+  ${props => props.theme.input}
+  ${props => props.theme.chickletedInputContainer}
+`;
+
+const secondaryChickletedInput = css`
+  ${props => props.theme.secondaryInput}
+  ${props => props.theme.chickletedInputContainer}
 `;
 
 const inlineInput = css`
@@ -397,7 +450,7 @@ const switchButton = css`
   display: block;
   height: ${props => props.theme.switchBtnHeight};
   width: ${props => props.theme.switchBtnWidth};
-  background: ${props => props.checked ? 
+  background: ${props => props.checked ?
   props.theme.switchBtnBgdActive : props.theme.switchBtnBgd};
   box-shadow: ${props => props.theme.switchBtnBoxShadow};
 `;
@@ -468,14 +521,14 @@ const inputCheckbox = css`
   :before {
      ${props => props.theme.checkboxBox};
   }
-  
+
   :after {
     ${props => props.theme.checkboxCheck};
   }
 `;
 
 const secondarySwitch = css`
-  ${props => props.theme.inputSwitch} 
+  ${props => props.theme.inputSwitch}
   :before {
     ${props => props.theme.switchTrack} background: ${props =>
         props.checked
@@ -484,7 +537,7 @@ const secondarySwitch = css`
   }
 
   :after {
-    ${props => props.theme.switchButton} 
+    ${props => props.theme.switchButton}
     background: ${props => props.checked
           ? props.theme.switchBtnBgdActive
           : props.theme.secondarySwitchBtnBgd};
@@ -496,21 +549,21 @@ const dropdownScrollBar = css`
     height: 10px;
     width: 10px;
   }
-  
+
   ::-webkit-scrollbar-corner {
     background: ${props => props.theme.dropdownListBgd};
   }
-  
+
   ::-webkit-scrollbar-track {
     background: ${props => props.theme.dropdownListBgd};
   }
-  
+
   ::-webkit-scrollbar-thumb {
     border-radius: 10px;
     background: ${props => props.theme.labelColor};
     border: 3px solid ${props => props.theme.dropdownListBgd};
   };
-  
+
   :vertical:hover {
     background: ${props => props.theme.textColorHl};
     cursor: pointer;
@@ -579,20 +632,20 @@ const sidePanelScrollBar = css`
     height: 10px;
     width: 10px;
   }
-  
+
   ::-webkit-scrollbar-corner {
     background: ${props => props.theme.sidePanelBg};
   }
-  
+
   ::-webkit-scrollbar-track {
     background: ${props => props.theme.sidePanelBg};
   }
-  
+
   ::-webkit-scrollbar-thumb {
     border-radius: 10px;
     background: ${props => props.theme.panelBackgroundHover};
     border: 3px solid ${props => props.theme.sidePanelBg};
-    
+
     :hover {
       background: ${props => props.theme.labelColor};
       cursor: pointer;
@@ -605,15 +658,15 @@ const panelDropdownScrollBar = css`
     height: 10px;
     width: 10px;
   }
-  
+
   ::-webkit-scrollbar-corner {
     background: ${props => props.theme.panelBackground};
   }
-  
+
   ::-webkit-scrollbar-track {
     background: ${props => props.theme.panelBackground};
   }
-  
+
   ::-webkit-scrollbar-thumb {
     border-radius: 10px;
     background: ${props => props.theme.panelBackgroundHover};
@@ -630,15 +683,15 @@ const scrollBar = css`
     height: 10px;
     width: 10px;
   }
-  
+
   ::-webkit-scrollbar-corner {
     background: ${props => props.theme.panelBackground};
   }
-  
+
   ::-webkit-scrollbar-track {
     background: ${props => props.theme.panelBackground};
   }
-  
+
   ::-webkit-scrollbar-thumb {
     border-radius: 10px;
     background: ${props => props.theme.labelColor};
@@ -648,7 +701,7 @@ const scrollBar = css`
       background: ${props => props.theme.textColorHl};
       cursor: pointer;
     }
-    
+
     :horizontal:hover {
       background: ${props => props.theme.textColorHl};
       cursor: pointer;
@@ -698,6 +751,9 @@ export const theme = {
   inputLT,
   inlineInput,
   chickletedInput,
+  chickletedInputContainer,
+  secondaryChickletedInput,
+
   secondaryInput,
   dropdownScrollBar,
   dropdownList,
@@ -753,6 +809,7 @@ export const theme = {
   selectFontSize,
   selectFontWeight,
   selectColorLT,
+  selectFontWeightBold,
 
   // Input
   inputBgd,
@@ -833,11 +890,16 @@ export const theme = {
   // Modal
   modalTitleColor,
   modalTitleFontSize,
+  modalTitleFontSizeSmaller,
   modalFooterBgd,
   modalImagePlaceHolder,
+  modalPadding,
 
   modalDialogBgd,
   modalDialogColor,
+
+  modalLateralPadding,
+  modalPortableLateralPadding,
 
   // Side Panel
   sidePanelBg,
@@ -886,9 +948,35 @@ export const theme = {
   sliderHandleColor,
   sliderHandleHoverColor,
   sliderHandleShadow,
+  sliderInputHeight,
+  sliderInputWidth,
 
   // Plot
-  rangeBrushBgd
+  rangeBrushBgd,
+  histogramFillInRange,
+  histogramFillOutRange,
+
+  // Notifications
+  notificationColors,
+  notificationPanelWidth,
+  notificationPanelItemWidth,
+  notificationPanelItemHeight,
+
+  // datagrid
+  columnWidth,
+  extendColumnWidth,
+  cellHeaderHeight,
+  cellHeight,
+  extendCellHeight,
+  gridDefaultWidth,
+  gridDefaultHeight,
+
+  // Action Panel
+  actionPanelWidth,
+  actionPanelHeight,
+
+  // Breakpoints
+  breakPoints
 };
 
 export const themeLT = {
@@ -896,7 +984,29 @@ export const themeLT = {
 
   // template
   input: inputLT,
-  panelActiveBg: panelActiveBgLT,
   textColor: textColorLT,
-  textColorHl: textColorHlLT
+  sidePanelBg: '#ffffff',
+  titleTextColor: '#000000',
+  sidePanelHeaderBg: '#f7f7F7',
+  subtextColorActive: '#2473bd',
+  tooltipBg: '#1869b5',
+  tooltipColor: '#ffffff',
+  dropdownListBgd: '#ffffff',
+  textColorHl: '#2473bd',
+  inputBgd: '#f7f7f7',
+  inputBgdHover: '#ffffff',
+  inputBgdActive: '#ffffff',
+  dropdownListHighlightBg: '#f0f0f0',
+  panelBackground: '#f7f7F7',
+  panelBackgroundHover: '#f7f7F7',
+  panelBorderColor: '#D3D8E0',
+  secondaryInputBgd: '#f7f7F7',
+  secondaryInputBgdActive: '#f7f7F7',
+  secondaryInputBgdHover: '#ffffff',
+  panelActiveBg: '#f7f7F7',
+  mapPanelBackgroundColor: '#ffffff',
+  mapPanelHeaderBackgroundColor: '#f7f7F7',
+  sliderBarBgd: '#D3D8E0',
+  secondarySwitchBtnBgd: '#D3D8E0',
+  switchTrackBgd: '#D3D8E0'
 };

@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,17 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import React, {Component} from 'react';
+import React, {PureComponent} from 'react';
 import PropTypes from 'prop-types';
 import styled from 'styled-components';
 
-import Sidebar from './side-panel/side-bar';
+import SidebarFactory from './side-panel/side-bar';
 import PanelHeaderFactory from './side-panel/panel-header';
-import LayerManager from './side-panel/layer-manager';
-import FilterManager from './side-panel/filter-manager';
-import InteractionManager from './side-panel/interaction-manager';
-import MapManager from './side-panel/map-manager';
-import PanelToggle from './side-panel/panel-toggle';
+import LayerManagerFactory from './side-panel/layer-manager';
+import FilterManagerFactory from './side-panel/filter-manager';
+import InteractionManagerFactory from './side-panel/interaction-manager';
+import MapManagerFactory from './side-panel/map-manager';
+import PanelToggleFactory from './side-panel/panel-toggle';
 
 import {
   ADD_DATA_ID,
@@ -36,7 +36,7 @@ import {
   DATA_TABLE_ID,
   EXPORT_IMAGE_ID,
   EXPORT_DATA_ID,
-  EXPORT_CONFIG_ID,
+  EXPORT_MAP_ID,
   PANELS
 } from 'constants/default-settings';
 
@@ -48,7 +48,7 @@ const SidePanelContent = styled.div`
   overflow-x: hidden;
 `;
 
-const PanelTitle = styled.div`
+export const PanelTitleFactory = () => styled.div`
   color: ${props => props.theme.titleTextColor};
   font-size: 20px;
   font-weight: 400;
@@ -56,15 +56,33 @@ const PanelTitle = styled.div`
   margin-bottom: 14px;
 `;
 
-SidePanelFactory.deps = [PanelHeaderFactory];
+SidePanelFactory.deps = [
+  SidebarFactory,
+  PanelHeaderFactory,
+  PanelToggleFactory,
+  PanelTitleFactory,
+  LayerManagerFactory,
+  FilterManagerFactory,
+  InteractionManagerFactory,
+  MapManagerFactory
+];
 
 /**
  *
  * Vertical sidebar containing input components for the rendering layers
  */
-export default function SidePanelFactory(PanelHeader) {
+export default function SidePanelFactory(
+  Sidebar,
+  PanelHeader,
+  PanelToggle,
+  PanelTitle,
+  LayerManager,
+  FilterManager,
+  InteractionManager,
+  MapManager
+) {
 
-  return class SidePanel extends Component {
+  return class SidePanel extends PureComponent {
     static propTypes = {
       filters: PropTypes.arrayOf(PropTypes.any).isRequired,
       interactionConfig: PropTypes.object.isRequired,
@@ -77,7 +95,6 @@ export default function SidePanelFactory(PanelHeader) {
       visStateActions: PropTypes.object.isRequired,
       mapStyleActions: PropTypes.object.isRequired
     };
-
     /* component private functions */
     _onOpenOrClose = () => {
       this.props.uiStateActions.toggleSidePanel(
@@ -108,7 +125,7 @@ export default function SidePanelFactory(PanelHeader) {
 
     _onExportData = () => this.props.uiStateActions.toggleModal(EXPORT_DATA_ID);
 
-    _onExportConfig = () => this.props.uiStateActions.toggleModal(EXPORT_CONFIG_ID);
+    _onExportMap = () => this.props.uiStateActions.toggleModal(EXPORT_MAP_ID);
 
     render() {
       const {
@@ -126,12 +143,14 @@ export default function SidePanelFactory(PanelHeader) {
         mapStyleActions,
         uiStateActions
       } = this.props;
+
       const {activeSidePanel} = uiState;
       const isOpen = Boolean(activeSidePanel);
 
       const layerManagerActions = {
         addLayer: visStateActions.addLayer,
         layerConfigChange: visStateActions.layerConfigChange,
+        layerTextLabelChange: visStateActions.layerTextLabelChange,
         layerVisualChannelConfigChange:
         visStateActions.layerVisualChannelConfigChange,
         layerTypeChange: visStateActions.layerTypeChange,
@@ -163,6 +182,7 @@ export default function SidePanelFactory(PanelHeader) {
         onConfigChange: mapStyleActions.mapConfigChange,
         onStyleChange: mapStyleActions.mapStyleChange,
         onBuildingChange: mapStyleActions.mapBuildingChange,
+        set3dBuildingColor: mapStyleActions.set3dBuildingColor,
         showAddMapStyleModal: this._showAddMapStyleModal
       };
 
@@ -179,7 +199,10 @@ export default function SidePanelFactory(PanelHeader) {
               version={version}
               onExportImage={this._onExportImage}
               onExportData={this._onExportData}
-              onExportConfig={this._onExportConfig}
+              visibleDropdown={uiState.visibleDropdown}
+              showExportDropdown={uiStateActions.showExportDropdown}
+              hideExportDropdown={uiStateActions.hideExportDropdown}
+              onExportMap={this._onExportMap}
               onSaveMap={this.props.onSaveMap}
             />
             <PanelToggle

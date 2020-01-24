@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,8 +20,8 @@
 
 import {KeplerGlLayers} from 'layers';
 const {PointLayer, ArcLayer, HexagonLayer, GeojsonLayer} = KeplerGlLayers;
-
-import {Messages, Crosshairs} from 'components/common/icons';
+import {getDefaultInteraction} from 'utils/interaction-utils';
+import {DEFAULT_TEXT_LABEL} from 'layers/layer-factory';
 
 export const savedStateV0 = {
   config: {
@@ -1030,13 +1030,18 @@ mergedLayer0.config = {
   colorField: null,
   colorScale: 'quantile',
   colorDomain: [0, 1],
+  strokeColorField: null,
+  strokeColorScale: 'quantile',
+  strokeColorDomain: [0, 1],
   sizeField: null,
   sizeScale: 'linear',
   sizeDomain: [0, 1],
+  textLabel: [DEFAULT_TEXT_LABEL],
   visConfig: {
     radius: 270.4,
     opacity: 0.8,
     outline: false,
+    filled: true,
     thickness: 2,
     fixedRadius: false,
     colorRange: {
@@ -1045,8 +1050,14 @@ mergedLayer0.config = {
       category: 'Uber',
       colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
     },
-    radiusRange: [1, 100],
-    'hi-precision': false
+    strokeColorRange: {
+      name: 'Global Warming',
+      type: 'sequential',
+      category: 'Uber',
+      colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
+    },
+    strokeColor: [76, 154, 78],
+    radiusRange: [1, 100]
   }
 };
 
@@ -1103,6 +1114,7 @@ mergedLayer1.config = {
   sizeField: null,
   sizeScale: 'linear',
   sizeDomain: [0, 1],
+  textLabel: [DEFAULT_TEXT_LABEL],
   visConfig: {
     opacity: 0.41,
     thickness: 2,
@@ -1113,8 +1125,7 @@ mergedLayer1.config = {
       category: 'Uber',
       colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
     },
-    sizeRange: [0, 10],
-    'hi-precision': false
+    sizeRange: [0, 10]
   }
 };
 
@@ -1141,7 +1152,7 @@ mergedLayer2.config = {
       optional: true
     }
   },
-  highlightColor: [252, 242, 26],
+  highlightColor: [252, 242, 26, 255],
   isConfigActive: false,
   isVisible: true,
   colorField: {
@@ -1153,6 +1164,9 @@ mergedLayer2.config = {
   },
   colorScale: 'ordinal',
   colorDomain: ['2.103.2', '2.107.3', '2.116.2', '2.117.1', '3.68.4'],
+  strokeColorField: null,
+  strokeColorScale: 'quantile',
+  strokeColorDomain: [0, 1],
   sizeField: {
     name: 'int_range',
     format: '',
@@ -1162,10 +1176,12 @@ mergedLayer2.config = {
   },
   sizeDomain: [78, 694],
   sizeScale: 'linear',
+  textLabel: [DEFAULT_TEXT_LABEL],
   visConfig: {
     radius: 10,
     opacity: 0.8,
     outline: false,
+    filled: true,
     thickness: 2,
     colorRange: {
       name: 'Sunrise',
@@ -1174,9 +1190,16 @@ mergedLayer2.config = {
       colors: ['#355C7D', '#6C5B7B', '#C06C84', '#F67280', '#F8B195'],
       reversed: false
     },
+    strokeColorRange: {
+      name: 'Sunrise',
+      type: 'sequential',
+      category: 'Uber',
+      colors: ['#355C7D', '#6C5B7B', '#C06C84', '#F67280', '#F8B195'],
+      reversed: false
+    },
+    strokeColor: [218, 112, 191],
     fixedRadius: false,
-    radiusRange: [1, 854.16],
-    'hi-precision': false
+    radiusRange: [1, 854.16]
   }
 };
 
@@ -1225,13 +1248,14 @@ mergedLayer3.config = {
     format: '',
     tableFieldIndex: 10
   },
-  highlightColor: [252, 242, 26],
+  highlightColor: [252, 242, 26, 255],
   isConfigActive: false,
   colorScale: 'quantile',
   colorDomain: [0, 1],
   sizeField: null,
   sizeScale: 'linear',
   sizeDomain: [0, 1],
+  textLabel: [DEFAULT_TEXT_LABEL],
   visConfig: {
     colorAggregation: 'maximum',
     sizeAggregation: 'average',
@@ -1249,8 +1273,7 @@ mergedLayer3.config = {
     sizeRange: [0, 50],
     percentile: [0, 100],
     elevationPercentile: [0, 100],
-    elevationScale: 10,
-    'hi-precision': false
+    elevationScale: 10
   }
 };
 
@@ -1285,7 +1308,7 @@ mergedLayer4.config = {
       fieldIdx: 0
     }
   },
-  highlightColor: [252, 242, 26],
+  highlightColor: [252, 242, 26, 255],
   isConfigActive: false,
   isVisible: true,
   colorField: {
@@ -1297,9 +1320,13 @@ mergedLayer4.config = {
   },
   colorScale: 'quantize',
   colorDomain: [94107, 94132],
+  strokeColorField: null,
+  strokeColorScale: 'quantile',
+  strokeColorDomain: [0, 1],
   sizeField: null,
   sizeScale: 'linear',
   sizeDomain: [0, 1],
+  textLabel: [DEFAULT_TEXT_LABEL],
   heightField: null,
   heightDomain: [0, 1],
   heightScale: 'linear',
@@ -1332,6 +1359,30 @@ mergedLayer4.config = {
       ],
       reversed: false
     },
+    strokeColorRange: {
+      name: 'Uber Viz Qualitative 3',
+      type: 'qualitative',
+      category: 'Uber',
+      colors: [
+        '#12939A',
+        '#DDB27C',
+        '#88572C',
+        '#FF991F',
+        '#F15C17',
+        '#223F9A',
+        '#DA70BF',
+        '#125C77',
+        '#4DC19C',
+        '#776E57',
+        '#17B8BE',
+        '#F6D18A',
+        '#B7885E',
+        '#FFCB99',
+        '#F89570'
+      ],
+      reversed: false
+    },
+    strokeColor: [255, 153, 31, 255],
     opacity: 0.8,
     thickness: 2,
     radius: 10,
@@ -1342,8 +1393,7 @@ mergedLayer4.config = {
     stroked: false,
     filled: true,
     enable3d: false,
-    wireframe: false,
-    'hi-precision': false
+    wireframe: false
   }
 };
 
@@ -1451,22 +1501,17 @@ export const mergedLayers = [
   mergedLayer4
 ];
 
+const defaultInteraction = getDefaultInteraction();
 export const mergedInteractions = {
+  ...defaultInteraction,
   tooltip: {
-    id: 'tooltip',
+    ...defaultInteraction.tooltip,
     enabled: true,
     config: {
       fieldsToShow: {
         '9h10t7fyb': ['int_range', 'detail', 'type_boolean'],
         v79816te8: ['ID', 'ZIP_CODE']
       }
-    },
-    iconComponent: Messages
-  },
-  brush: {
-    id: 'brush',
-    enabled: false,
-    config: {size: 0.5},
-    iconComponent: Crosshairs
+    }
   }
 };

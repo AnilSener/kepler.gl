@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,6 @@ import {HexagonLayer} from 'deck.gl';
 import {pointToHexbin} from './hexagon-aggregator';
 
 import {getColorValueDomain, getColorScaleFunction} from '../layer-utils/utils';
-import EnhancedHexagonCellLayer from './enhanced-hexagon-cell-layer';
 
 const defaultProps = {
   ...HexagonLayer.defaultProps,
@@ -34,7 +33,7 @@ export default class EnhancedHexagonLayer extends HexagonLayer {
   getDimensionUpdaters() {
     const dimensionUpdaters = super.getDimensionUpdaters();
     // add colorScale to dimension updates
-    dimensionUpdaters.getColor[1].triggers.push('colorScale');
+    dimensionUpdaters.getFillColor[1].triggers.push('colorScale');
     return dimensionUpdaters;
   }
 
@@ -48,13 +47,6 @@ export default class EnhancedHexagonLayer extends HexagonLayer {
 
   getColorScale() {
     getColorScaleFunction(this);
-  }
-
-  /*
-   * override default getSubLayerClass to return customized cellLayer
-   */
-  getSubLayerClass() {
-    return EnhancedHexagonCellLayer;
   }
 }
 

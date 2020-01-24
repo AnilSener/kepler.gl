@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ import {media, breakPoints} from '../styles';
 import {HERO_IMAGES, HERO_IMAGES_SCALED} from '../content';
 import SlideShow from './common/slideshow';
 import {LinkButton} from './common/styled-components';
+import {DEMO_LINK} from '../constants';
 
 const SlideShowAnimation = keyframes`
   0% {
@@ -199,13 +200,13 @@ export default class Hero extends PureComponent {
               <span>data sets.</span>
             </div>
             <ButtonContainer>
-              <LinkButton large href="#/demo">
+              <LinkButton large href={DEMO_LINK}>
                 Get Started
               </LinkButton>
               <LinkButton
                 large
                 outlineDark
-                href="https://github.com/uber/kepler.gl"
+                href="https://github.com/keplergl/kepler.gl"
                 style={{marginLeft: '5px'}}
               >
                 <img src={cdnUrl('icons/github.svg')} /> Github

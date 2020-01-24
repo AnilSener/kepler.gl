@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,3 +24,4 @@ import './grid-layer-specs';
 import './point-layer-specs';
 import './hexagon-layer-specs';
 import './heatmap-layer-specs';
+import './scenegraph-layer-specs';

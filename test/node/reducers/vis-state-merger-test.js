@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,14 +25,15 @@ import {
   mergeFilters,
   mergeLayers,
   mergeInteractions,
-  mergeLayerBlending
+  mergeLayerBlending,
+  mergeSplitMaps
 } from 'reducers/vis-state-merger';
-import {Messages, Crosshairs} from 'components/common/icons';
 
 import SchemaManager from 'schemas';
 import visStateReducer from 'reducers/vis-state';
 import {updateVisData} from 'actions/vis-state-actions';
 import {receiveMapConfig} from 'actions/actions';
+import {getDefaultInteraction} from 'utils/interaction-utils';
 
 // fixtures
 import {
@@ -52,6 +53,10 @@ import {
   mergedLayers as mergedLayersV1Split,
   mergedSplitMaps as mergedSplitMapsV1
 } from 'test/fixtures/state-saved-v1-3';
+import {
+  stateSavedV1 as savedStateV1Label,
+  mergedLayers as mergedLayersV1Label
+} from 'test/fixtures/state-saved-v1-4';
 /*
 import {
   mergedFiltersV0,
@@ -78,12 +83,13 @@ import {cmpFilters, cmpLayers} from 'test/helpers/comparison-utils';
 import {
   InitialState,
   StateWFilters,
-  StateWFilesFiltersLayerColor
+  StateWFilesFiltersLayerColor,
+  StateWSplitMaps
 } from 'test/helpers/mock-state';
 
 test('VisStateMerger.v0 -> mergeFilters -> toEmptyState', t => {
   const savedConfig = cloneDeep(savedStateV0);
-  const oldState = InitialState.toJS();
+  const oldState = cloneDeep(InitialState);
   const oldVisState = oldState.visState;
 
   const parsedConfig = SchemaManager.parseSavedConfig(
@@ -122,7 +128,7 @@ test('VisStateMerger.v0 -> mergeFilters -> toEmptyState', t => {
 
 test('VisStateMerger.v1 -> mergeFilters -> toEmptyState', t => {
   const savedConfig = cloneDeep(savedStateV1);
-  const oldState = InitialState.toJS();
+  const oldState = cloneDeep(InitialState);
   const oldVisState = oldState.visState;
 
   const parsedConfig = SchemaManager.parseSavedConfig(
@@ -161,7 +167,7 @@ test('VisStateMerger.v1 -> mergeFilters -> toEmptyState', t => {
 
 test('VisStateMerger.v0 -> mergeFilters -> toWorkingState', t => {
   const savedConfig = cloneDeep(savedStateV0);
-  const oldState = StateWFilters.toJS();
+  const oldState = cloneDeep(StateWFilters);
 
   const oldVisState = oldState.visState;
   const oldFilters = [...oldState.visState.filters];
@@ -209,7 +215,7 @@ test('VisStateMerger.v0 -> mergeFilters -> toWorkingState', t => {
 
 test('VisStateMerger.v1 -> mergeFilters -> toWorkingState', t => {
   const savedConfig = cloneDeep(savedStateV1);
-  const oldState = StateWFilters.toJS();
+  const oldState = cloneDeep(StateWFilters);
 
   const oldVisState = oldState.visState;
   const oldFilters = [...oldState.visState.filters];
@@ -256,12 +262,12 @@ test('VisStateMerger.v1 -> mergeFilters -> toWorkingState', t => {
 });
 
 test('VisStateMerger.current -> mergeLayers -> toEmptyState', t => {
-  const stateToSave = StateWFilesFiltersLayerColor.toJS();
+  const stateToSave = cloneDeep(StateWFilesFiltersLayerColor);
   const appStateToSave = SchemaManager.save(stateToSave);
   const configToSave = appStateToSave.config;
   const configParsed = SchemaManager.parseSavedConfig(configToSave);
 
-  const oldState = InitialState.toJS();
+  const oldState = cloneDeep(InitialState);
   const oldVisState = oldState.visState;
 
   const parsedLayers = configParsed.visState.layers;
@@ -302,7 +308,7 @@ test('VisStateMerger.v1 -> mergeLayers -> toEmptyState', t => {
   const savedConfig = cloneDeep(savedStateV1);
   const parsedConfig = SchemaManager.parseSavedConfig(savedConfig.config);
 
-  const oldState = InitialState.toJS();
+  const oldState = cloneDeep(InitialState);
   const oldVisState = oldState.visState;
 
   const parsedLayers = parsedConfig.visState.layers;
@@ -331,14 +337,53 @@ test('VisStateMerger.v1 -> mergeLayers -> toEmptyState', t => {
   const stateWData = visStateReducer(mergedState, updateVisData(parsedData));
 
   // test parsed layers
-  cmpLayers(t, mergedLayersV1, stateWData.layers, {id: true});
+  cmpLayers(t, mergedLayersV1, stateWData.layers, {id: true, color: true});
+  t.end();
+});
+
+test('VisStateMerger.v1.label -> mergeLayers -> toEmptyState', t => {
+  const savedConfig = cloneDeep(savedStateV1Label);
+  const parsedConfig = SchemaManager.parseSavedConfig(savedConfig.config);
+
+  const oldState = cloneDeep(InitialState);
+  const oldVisState = oldState.visState;
+
+  const parsedLayers = parsedConfig.visState.layers;
+
+  // mergeLayers
+  const mergedState = mergeLayers(oldState.visState, parsedLayers);
+
+  Object.keys(oldVisState).forEach(key => {
+    if (key === 'layerToBeMerged') {
+      t.deepEqual(
+        mergedState.layerToBeMerged,
+        parsedLayers,
+        'Should save layers to layerToBeMerged before data loaded'
+      );
+    } else {
+      t.deepEqual(
+        mergedState[key],
+        oldVisState[key],
+        'Should keep the rest of state same'
+      );
+    }
+  });
+  const parsedData = SchemaManager.parseSavedData(savedStateV1Label.datasets);
+
+  // load data into reducer
+  const stateWData = visStateReducer(mergedState, updateVisData(parsedData));
+
+  // test parsed layers
+  cmpLayers(t, mergedLayersV1Label, stateWData.layers, {id: true});
   t.end();
 });
 
 test('VisStateMerger.v1.split -> mergeLayers -> toEmptyState', t => {
   const savedConfig = cloneDeep(savedStateV1Split);
   const parsedConfig = SchemaManager.parseSavedConfig(savedConfig.config);
-  const oldState = InitialState.toJS();
+  const expectedConfig = mergedSplitMapsV1;
+  const oldState = cloneDeep(InitialState);
+
   const oldVisState = oldState.visState;
 
   const parsedLayers = parsedConfig.visState.layers;
@@ -358,8 +403,14 @@ test('VisStateMerger.v1.split -> mergeLayers -> toEmptyState', t => {
     } else if (key === 'splitMaps') {
       t.deepEqual(
         mergedState.splitMaps,
-        mergedSplitMapsV1,
-        'Should merge splitMaps'
+        [],
+        'Should wait to merge splitMaps'
+      );
+    } else if (key === 'splitMaps') {
+      t.deepEqual(
+        mergedState.splitMapsToBeMerged,
+        expectedConfig,
+        'Should save to splitMapsToBeMerged'
       );
     } else if (key === 'interactionToBeMerged') {
       t.deepEqual(
@@ -382,11 +433,7 @@ test('VisStateMerger.v1.split -> mergeLayers -> toEmptyState', t => {
   const stateWData = visStateReducer(mergedState, updateVisData(parsedData));
 
   // test split Maps
-  t.deepEqual(
-    stateWData.splitMaps,
-    mergedSplitMapsV1,
-    'should merge splitMaps'
-  );
+  t.deepEqual(stateWData.splitMaps, expectedConfig, 'should merge splitMaps');
 
   // test parsed layers
   cmpLayers(t, mergedLayersV1Split, stateWData.layers, {id: true});
@@ -395,11 +442,9 @@ test('VisStateMerger.v1.split -> mergeLayers -> toEmptyState', t => {
 
 test('VisStateMerger.v0 -> mergeLayers -> toWorkingState', t => {
   const savedConfig = cloneDeep(savedStateV0);
-  const parsedConfig = SchemaManager.parseSavedConfig(
-    savedConfig.config
-  );
+  const parsedConfig = SchemaManager.parseSavedConfig(savedConfig.config);
 
-  const oldState = StateWFilesFiltersLayerColor.toJS();
+  const oldState = cloneDeep(StateWFilesFiltersLayerColor);
   const oldVisState = oldState.visState;
   const oldLayers = [...oldVisState.layers];
 
@@ -449,11 +494,9 @@ test('VisStateMerger.v0 -> mergeLayers -> toWorkingState', t => {
 
 test('VisStateMerger.v1 -> mergeLayers -> toWorkingState', t => {
   const savedConfig = cloneDeep(savedStateV1);
-  const parsedConfig = SchemaManager.parseSavedConfig(
-    savedConfig.config
-  );
+  const parsedConfig = SchemaManager.parseSavedConfig(savedConfig.config);
 
-  const oldState = StateWFilesFiltersLayerColor.toJS();
+  const oldState = cloneDeep(StateWFilesFiltersLayerColor);
   const oldVisState = oldState.visState;
   const oldLayers = [...oldVisState.layers];
 
@@ -503,7 +546,7 @@ test('VisStateMerger.v1 -> mergeLayers -> toWorkingState', t => {
 
 test('VisStateMerger.v0 -> mergeInteractions -> toEmptyState', t => {
   const savedConfig = cloneDeep(savedStateV0);
-  const oldState = InitialState.toJS();
+  const oldState = cloneDeep(InitialState);
   const oldVisState = oldState.visState;
 
   const parsedConfig = SchemaManager.parseSavedConfig(
@@ -533,25 +576,7 @@ test('VisStateMerger.v0 -> mergeInteractions -> toEmptyState', t => {
     } else if (key === 'interactionConfig') {
       t.deepEqual(
         mergedState.interactionConfig,
-        {
-          tooltip: {
-            id: 'tooltip',
-            enabled: true,
-            config: {
-              fieldsToShow: {}
-            },
-            iconComponent: Messages
-          },
-          brush: {
-            id: 'brush',
-            enabled: false,
-            config: {
-              size: 0.5
-            },
-            iconComponent: Crosshairs
-          }
-        },
-
+        oldState.visState.interactionConfig,
         'Should disable interaction: null'
       );
     } else {
@@ -581,7 +606,7 @@ test('VisStateMerger.v0 -> mergeInteractions -> toEmptyState', t => {
 
 test('VisStateMerger.v0 -> mergeInteractions -> toWorkingState', t => {
   const savedConfig = cloneDeep(savedStateV0);
-  const oldState = StateWFilesFiltersLayerColor.toJS();
+  const oldState = cloneDeep(StateWFilesFiltersLayerColor);
   const oldVisState = oldState.visState;
 
   // add random items to interactionToBeMerged
@@ -634,12 +659,13 @@ test('VisStateMerger.v0 -> mergeInteractions -> toWorkingState', t => {
 
   // load data into reducer
   const stateWData = visStateReducer(mergedState, updateVisData(parsedData));
+  const defaultInteraction = getDefaultInteraction();
 
   const expectedInteractions = {
+    ...defaultInteraction,
     tooltip: {
-      id: 'tooltip',
+      ...defaultInteraction.tooltip,
       enabled: true,
-      iconComponent: Messages,
       config: {
         fieldsToShow: {
           '190vdll3di': [
@@ -654,12 +680,6 @@ test('VisStateMerger.v0 -> mergeInteractions -> toWorkingState', t => {
           v79816te8: ['ID', 'ZIP_CODE']
         }
       }
-    },
-    brush: {
-      id: 'brush',
-      enabled: false,
-      iconComponent: Crosshairs,
-      config: {size: 0.5}
     }
   };
 
@@ -676,7 +696,7 @@ test('VisStateMerger.v0 -> mergeInteractions -> toWorkingState', t => {
 
 test('VisStateMerger.v1 -> mergeInteractions -> toEmptyState', t => {
   const savedConfig = cloneDeep(savedStateV1);
-  const oldState = InitialState.toJS();
+  const oldState = cloneDeep(InitialState);
   const oldVisState = oldState.visState;
 
   const parsedConfig = SchemaManager.parseSavedConfig(
@@ -687,6 +707,7 @@ test('VisStateMerger.v1 -> mergeInteractions -> toEmptyState', t => {
 
   // merge interactions
   const mergedState = mergeInteractions(oldState.visState, parsedInteraction);
+  const defaultInteraction = getDefaultInteraction();
 
   Object.keys(oldVisState).forEach(key => {
     if (key === 'interactionToBeMerged') {
@@ -706,25 +727,24 @@ test('VisStateMerger.v1 -> mergeInteractions -> toEmptyState', t => {
       t.deepEqual(
         mergedState.interactionConfig,
         {
+          ...defaultInteraction,
           tooltip: {
-            id: 'tooltip',
+            ...defaultInteraction.tooltip,
             enabled: false,
             config: {
               fieldsToShow: {}
-            },
-            iconComponent: Messages
+            }
           },
           brush: {
-            id: 'brush',
+            ...defaultInteraction.brush,
             enabled: false,
             config: {
               size: 1
-            },
-            iconComponent: Crosshairs
+            }
           }
         },
 
-        'Should disable interaction: null'
+        'Should disable tooltip'
       );
     } else {
       t.deepEqual(
@@ -753,7 +773,7 @@ test('VisStateMerger.v1 -> mergeInteractions -> toEmptyState', t => {
 
 test('VisStateMerger.v1 -> mergeInteractions -> toWorkingState', t => {
   const savedConfig = cloneDeep(savedStateV1);
-  const oldState = StateWFilesFiltersLayerColor.toJS();
+  const oldState = cloneDeep(StateWFilesFiltersLayerColor);
   const oldVisState = oldState.visState;
 
   // add random items to interactionToBeMerged
@@ -775,6 +795,7 @@ test('VisStateMerger.v1 -> mergeInteractions -> toWorkingState', t => {
 
   // merge interactions
   const mergedState = mergeInteractions(oldState.visState, parsedInteraction);
+  const defaultInteraction = getDefaultInteraction();
 
   const expectedInteractionToBeMerged = {
     tooltip: {
@@ -796,9 +817,9 @@ test('VisStateMerger.v1 -> mergeInteractions -> toWorkingState', t => {
       t.deepEqual(
         mergedState.interactionConfig,
         {
+          ...defaultInteraction,
           tooltip: {
-            id: 'tooltip',
-            iconComponent: Messages,
+            ...defaultInteraction.tooltip,
             enabled: false,
             config: {
               fieldsToShow: {
@@ -813,10 +834,10 @@ test('VisStateMerger.v1 -> mergeInteractions -> toWorkingState', t => {
               }
             }
           },
+
           brush: {
-            id: 'brush',
+            ...defaultInteraction.brush,
             enabled: false,
-            iconComponent: Crosshairs,
             config: {
               size: 1
             }
@@ -840,10 +861,10 @@ test('VisStateMerger.v1 -> mergeInteractions -> toWorkingState', t => {
   const stateWData = visStateReducer(mergedState, updateVisData(parsedData));
 
   const expectedInteractions = {
+    ...defaultInteraction,
     tooltip: {
-      id: 'tooltip',
+      ...defaultInteraction.tooltip,
       enabled: false,
-      iconComponent: Messages,
       config: {
         fieldsToShow: {
           '190vdll3di': [
@@ -859,9 +880,8 @@ test('VisStateMerger.v1 -> mergeInteractions -> toWorkingState', t => {
       }
     },
     brush: {
-      id: 'brush',
+      ...defaultInteraction.brush,
       enabled: false,
-      iconComponent: Crosshairs,
       config: {size: 1}
     }
   };
@@ -870,7 +890,7 @@ test('VisStateMerger.v1 -> mergeInteractions -> toWorkingState', t => {
   t.deepEqual(
     stateWData.interactionConfig,
     expectedInteractions,
-    'should merge interactionconfig'
+    'should merge interactionConfig'
   );
   t.deepEqual(stateWData.interactionToBeMerged, {}, 'should clear interaction');
 
@@ -901,6 +921,152 @@ test('VisStateMerger - mergeLayerBlending', t => {
     mergeLayerBlending(preState, null),
     {layerBlending: 'additive'},
     'should merge layerBlending'
+  );
+
+  t.end();
+});
+
+test('VisStateMerger - mergeSplitMaps -> split to split', t => {
+  // state with splitMaps
+  const oldState = cloneDeep(StateWSplitMaps).visState;
+  // saved config with splitMaps
+  const savedConfig = cloneDeep(savedStateV1Split);
+  const parsedConfig = SchemaManager.parseSavedConfig(savedConfig.config);
+
+  // 1. merge State reset current splitMaps
+  const mergedState = visStateReducer(oldState, receiveMapConfig(parsedConfig));
+
+  const expectedToMerge = [
+    {
+      layers: {
+        f24uw1: false,
+        '9x77w7h': true
+      }
+    },
+    {
+      layers: {
+        f24uw1: true,
+        '9x77w7h': false
+      }
+    }
+  ];
+
+  const expectedToMergeAll = [
+    {
+      layers: {
+        f24uw1: false,
+        '9x77w7h': true,
+        'point-0': false,
+        'geojson-1': true
+      }
+    },
+    {
+      layers: {
+        f24uw1: true,
+        '9x77w7h': false,
+        'point-0': true,
+        'geojson-1': true
+      }
+    }
+  ];
+  t.deepEqual(mergedState.splitMaps, [], 'Should reset splitMaps');
+  t.deepEqual(mergedState.splitMapsToBeMerged, expectedToMerge);
+
+  // 2. merge State keep current splitMaps
+  const mergedState2 = visStateReducer(
+    oldState,
+    receiveMapConfig(parsedConfig, {keepExistingConfig: true})
+  );
+  t.deepEqual(
+    mergedState2.splitMaps,
+    oldState.splitMaps,
+    'Should keep current splitMaps'
+  );
+  t.deepEqual(
+    mergedState2.splitMapsToBeMerged,
+    expectedToMerge,
+    'Should save unmerged to splitMapsToBeMerged'
+  );
+
+  const parsedData = SchemaManager.parseSavedData(savedConfig.datasets);
+  // 3. load data into reducer
+  const mergedState3 = visStateReducer(mergedState2, updateVisData(parsedData));
+
+  t.deepEqual(
+    mergedState3.splitMaps,
+    expectedToMergeAll,
+    'Should merge all splitMaps'
+  );
+  t.deepEqual(
+    mergedState3.splitMapsToBeMerged,
+    [],
+    'Should empty splitMapsToBeMerged'
+  );
+
+  t.end();
+});
+
+test('VisStateMerger - mergeSplitMaps', t => {
+  const testState1 = {
+    layers: [],
+    splitMaps: [{layers: {a: true}}, {layers: {a: false}}]
+  };
+
+  t.deepEqual(
+    mergeSplitMaps(testState1, []),
+    {...testState1, splitMapsToBeMerged: []},
+    'should return empty'
+  );
+
+  const testSM = [{layers: {c: true}}, {layers: {c: false}}];
+
+  t.deepEqual(
+    mergeSplitMaps(testState1, testSM),
+    {...testState1, splitMapsToBeMerged: testSM},
+    'should save non-exist layers to splitMapsToBeMerged'
+  );
+
+  const testState2 = {
+    layers: [{id: 'c', config: {isVisible: true}}],
+    splitMaps: [{layers: {a: true}}, {layers: {a: false}}]
+  };
+
+  t.deepEqual(
+    mergeSplitMaps(testState2, testSM),
+    {
+      ...testState2,
+      splitMaps: [{layers: {a: true, c: true}}, {layers: {a: false, c: false}}],
+      splitMapsToBeMerged: []
+    },
+    'should merge split maps'
+  );
+
+  const testState3 = {
+    layers: [{id: 'c', config: {isVisible: true}}],
+    splitMaps: []
+  };
+  t.deepEqual(
+    mergeSplitMaps(testState3, testSM),
+    {
+      ...testState3,
+      splitMaps: [{layers: {c: true}}, {layers: {c: false}}],
+      splitMapsToBeMerged: []
+    },
+    'should create split maps panel and merge split maps'
+  );
+
+  const testState4 = {
+    layers: [{id: 'a', config: {isVisible: true}}, {id: 'b', config: {isVisible: false}}, {id: 'c', config: {isVisible: true}}],
+    splitMaps: []
+  };
+  t.deepEqual(
+    mergeSplitMaps(testState4, testSM),
+    {
+      ...testState4,
+      splitMaps: [{layers: {a: true, c: true}}, {layers: {a: true, c: false}}],
+      splitMapsToBeMerged: []
+    },
+    'should create split maps panel, add current layer to splitMaps and merge split maps'
   );
 
   t.end();

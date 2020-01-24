@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,8 @@ import {default as GeojsonLayer} from './geojson-layer/geojson-layer';
 import {default as ClusterLayer} from './cluster-layer/cluster-layer';
 import {default as IconLayer} from './icon-layer/icon-layer';
 import {default as HeatmapLayer} from './heatmap-layer/heatmap-layer';
+import {default as H3Layer} from './h3-hexagon-layer/h3-hexagon-layer';
+import {default as ScenegraphLayer} from './scenegraph-layer/scenegraph-layer';
 
 // base layer
 export {default as Layer} from './base-layer';
@@ -41,7 +43,9 @@ export const KeplerGlLayers = {
   GeojsonLayer,
   ClusterLayer,
   IconLayer,
-  HeatmapLayer
+  HeatmapLayer,
+  H3Layer,
+  ScenegraphLayer
 };
 
 export const LayerClasses = {
@@ -53,5 +57,7 @@ export const LayerClasses = {
   geojson: GeojsonLayer,
   cluster: ClusterLayer,
   icon: IconLayer,
-  heatmap: HeatmapLayer
+  heatmap: HeatmapLayer,
+  hexagonId: H3Layer,
+  '3D': ScenegraphLayer
 };

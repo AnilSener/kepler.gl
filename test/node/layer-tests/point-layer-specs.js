@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,10 +21,10 @@
 import test from 'tape';
 import {
   testCreateCases,
-  testFormatLayerDataCases
+  testFormatLayerDataCases,
+  testRenderLayerCases
 } from 'test/helpers/layer-utils';
 import csvData, {testFields} from 'test/fixtures/test-csv-data';
-
 import {KeplerGlLayers} from 'layers';
 const {PointLayer} = KeplerGlLayers;
 
@@ -93,6 +93,10 @@ test('#PointLayer -> formatLayerData', t => {
       test: result => {
         const {layerData, layer} = result;
         const expectedLayerData = {
+          textLabels: {
+            characterSet: [],
+            getText: () => {}
+          },
           data: [
             {
               data: rows[0]
@@ -105,14 +109,15 @@ test('#PointLayer -> formatLayerData', t => {
             }
           ],
           getPosition: () => {},
-          getColor: () => {},
+          getFillColor: () => {},
+          getLineColor: () => {},
           getRadius: () => {}
         };
 
         t.deepEqual(
-          Object.keys(layerData),
-          ['data', 'getPosition', 'getColor', 'getRadius'],
-          'layerData should have 3 keys'
+          Object.keys(layerData).sort(),
+          Object.keys(expectedLayerData).sort(),
+          'layerData should have 6 keys'
         );
         t.deepEqual(
           layerData.data,
@@ -120,10 +125,18 @@ test('#PointLayer -> formatLayerData', t => {
           'should format correct grid layerData'
         );
         t.ok(
-          ['getPosition', 'getColor', 'getRadius'].every(
-            k => typeof layerData[k] === 'function'
-          ),
-          'should have getPosition, getColor, getRadius accessor as function'
+          typeof layerData.getPosition === 'function',
+          'should have getPosition accessor as function'
+        );
+        t.deepEqual(
+          layerData.getFillColor,
+          layer.config.color,
+          'getFillColor should be a constant'
+        );
+        t.deepEqual(
+          layerData.getRadius,
+          1,
+          'getRadius should be a constant'
         );
         t.deepEqual(
           layerData.getPosition(layerData.data[0]),
@@ -183,8 +196,10 @@ test('#PointLayer -> formatLayerData', t => {
             }
           ],
           getPosition: () => {},
-          getColor: () => {},
-          getRadius: () => {}
+          getLineColor: () => {},
+          getFillColor: () => {},
+          getRadius: () => {},
+          getText: () => {}
         };
         t.deepEqual(
           layer.config.colorDomain,
@@ -192,9 +207,9 @@ test('#PointLayer -> formatLayerData', t => {
           'should update layer color domain'
         );
         t.deepEqual(
-          Object.keys(layerData),
-          ['data', 'getPosition', 'getColor', 'getRadius'],
-          'layerData should have 4 keys'
+          Object.keys(layerData).sort,
+          Object.keys(expectedLayerData).sort,
+          'layerData should have 6 keys'
         );
         t.deepEqual(
           layerData.data,
@@ -202,10 +217,10 @@ test('#PointLayer -> formatLayerData', t => {
           'should filter out nulls, format correct point layerData'
         );
         t.ok(
-          ['getPosition', 'getColor', 'getRadius'].every(
+          ['getPosition', 'getFillColor', 'getRadius'].every(
             k => typeof layerData[k] === 'function'
           ),
-          'should have getPosition, getColor, getRadius accessor as function'
+          'should have getPosition, getFillColor, getRadius accessor as function'
         );
         t.deepEqual(
           layerData.getPosition(layerData.data[0]),
@@ -218,9 +233,9 @@ test('#PointLayer -> formatLayerData', t => {
           'should format correct grid layerData'
         );
         t.deepEqual(
-          layerData.getColor(layerData.data[0]),
+          layerData.getFillColor(layerData.data[0]),
           [90, 24, 70],
-          'getColor should return correct lat lng'
+          'getColor should return correct color'
         );
         t.equal(
           layerData.getRadius(layerData.data[0]),
@@ -232,5 +247,38 @@ test('#PointLayer -> formatLayerData', t => {
   ];
 
   testFormatLayerDataCases(t, PointLayer, TEST_CASES);
+  t.end();
+});
+
+test('#PointLayer -> renderLayer', t => {
+  const {rows} = processCsvData(csvData);
+
+  const filteredIndex = [0, 2, 4];
+  const data = [rows[0], rows[2], rows[4]];
+
+  const TEST_CASES = [{
+    props: {
+      dataId: '0dj3h',
+      label: 'gps point',
+      columns: {
+        lat: {
+          value: 'gps_data.lat',
+          fieldIdx: 1
+        },
+        lng: {
+          value: 'gps_data.lng',
+          fieldIdx: 2
+        },
+        altitude: {
+          value: null,
+          fieldIdx: -1,
+          optional: true
+        }
+      }
+    },
+    data: [data, rows, filteredIndex, undefined]
+  }];
+
+  testRenderLayerCases(t, PointLayer, TEST_CASES);
   t.end();
 });

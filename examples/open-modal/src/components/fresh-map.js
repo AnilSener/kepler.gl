@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@ import {addDataToMap, wrapTo} from 'kepler.gl/actions';
 import KeplerGl from 'kepler.gl';
 
 import sampleData from '../data/sample-data';
-import config from '../configurations/config.json';
+import config from '../configurations/config';
 
 export default class FreshMap extends Component {
   componentDidMount() {

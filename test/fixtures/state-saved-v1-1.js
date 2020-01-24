@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,7 +19,8 @@
 // THE SOFTWARE.
 
 import GeojsonLayer from 'layers/geojson-layer/geojson-layer';
-import {Messages, Crosshairs} from 'components/common/icons';
+import {DEFAULT_TEXT_LABEL} from 'layers/layer-factory';
+import {getDefaultInteraction} from 'utils/interaction-utils';
 
 export const savedStateV1 = {
   datasets: [
@@ -673,7 +674,6 @@ export const savedStateV1 = {
                 radiusRange: [0, 50],
                 heightRange: [0, 500],
                 elevationScale: 18,
-                'hi-precision': true,
                 stroked: true,
                 filled: true,
                 enable3d: true,
@@ -875,7 +875,7 @@ mergedLayer0.config = {
   },
   isVisible: true,
   isConfigActive: false,
-  highlightColor: [252, 242, 26],
+  highlightColor: [252, 242, 26, 255],
   colorField: {
     name: 'c_m_r',
     type: 'integer',
@@ -885,9 +885,19 @@ mergedLayer0.config = {
   },
   colorScale: 'quantize',
   colorDomain: [45, 9642],
+  strokeColorField: {
+    name: 'c_m_r',
+    type: 'integer',
+    id: 'c_m_r',
+    format: '',
+    tableFieldIndex: 9
+  },
+  strokeColorScale: 'quantize',
+  strokeColorDomain: [45, 9642],
   sizeField: null,
   sizeScale: 'linear',
   sizeDomain: [0, 1],
+  textLabel: [DEFAULT_TEXT_LABEL],
   heightField: {
     name: 'c_a_v',
     type: 'real',
@@ -920,14 +930,31 @@ mergedLayer0.config = {
       ],
       reversed: true
     },
+    strokeColorRange: {
+      name: 'ColorBrewer YlGnBu-9',
+      type: 'sequential',
+      category: 'ColorBrewer',
+      colors: [
+        '#081d58',
+        '#253494',
+        '#225ea8',
+        '#1d91c0',
+        '#41b6c4',
+        '#7fcdbb',
+        '#c7e9b4',
+        '#edf8b1',
+        '#ffffd9'
+      ],
+      reversed: true
+    },
     radius: 10,
     sizeRange: [0, 10],
     radiusRange: [0, 50],
     heightRange: [0, 500],
     elevationScale: 18,
-    'hi-precision': true,
     stroked: true,
     filled: true,
+    strokeColor: [181, 18, 65],
     enable3d: true,
     wireframe: false
   }
@@ -943,7 +970,6 @@ mergedLayer0.meta = {
     lightsStrength: [0.9, 0, 0.8, 0],
     numberOfLights: 2
   },
-  fp64: false,
   fixedRadius: false,
   featureTypes: {polygon: true}
 };
@@ -2667,10 +2693,13 @@ mergedLayer1.config = {
   },
   isVisible: true,
   isConfigActive: false,
-  highlightColor: [252, 242, 26],
+  highlightColor: [252, 242, 26, 255],
   colorField: null,
   colorScale: 'quantile',
   colorDomain: [0, 1],
+  strokeColorField: null,
+  strokeColorScale: 'quantile',
+  strokeColorDomain: [0, 1],
   sizeField: {
     name: 'c_ta',
     id: 'c_ta',
@@ -2680,6 +2709,7 @@ mergedLayer1.config = {
   },
   sizeScale: 'linear',
   sizeDomain: [0.970877074, 1],
+  textLabel: [DEFAULT_TEXT_LABEL],
   heightField: null,
   heightScale: 'linear',
   heightDomain: [0, 1],
@@ -2695,16 +2725,22 @@ mergedLayer1.config = {
       category: 'Uber',
       colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
     },
+    strokeColorRange: {
+      name: 'Global Warming',
+      type: 'sequential',
+      category: 'Uber',
+      colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
+    },
     radius: 10,
     sizeRange: [18.9, 47.6],
     radiusRange: [0, 50],
     heightRange: [0, 500],
     elevationScale: 5,
-    'hi-precision': false,
     stroked: true,
     filled: false,
     enable3d: false,
-    wireframe: false
+    wireframe: false,
+    strokeColor: [221, 178, 124]
   }
 };
 
@@ -2718,7 +2754,6 @@ mergedLayer1.meta = {
     lightsStrength: [0.9, 0, 0.8, 0],
     numberOfLights: 2
   },
-  fp64: false,
   fixedRadius: false,
   featureTypes: {
     polygon: true
@@ -2729,10 +2764,11 @@ mergedLayer1.dataToFeature = mergedLayer0.dataToFeature;
 
 export const mergedLayers = [mergedLayer0, mergedLayer1];
 
+const defaultInteraction = getDefaultInteraction();
 export const mergedInteraction = {
+  ...defaultInteraction,
   tooltip: {
-    id: 'tooltip',
-    iconComponent: Messages,
+    ...defaultInteraction.tooltip,
     enabled: false,
     config: {
       fieldsToShow: {
@@ -2741,9 +2777,8 @@ export const mergedInteraction = {
     }
   },
   brush: {
-    id: 'brush',
+    ...defaultInteraction.brush,
     enabled: false,
-    iconComponent: Crosshairs,
     config: {
       size: 1
     }

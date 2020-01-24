@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ import window from 'global/window';
  * @param {number} count
  * @returns {string} hash string
  */
-export function generateHashId(count) {
+export function generateHashId(count = 6) {
   return Math.random()
     .toString(36)
     .substr(count);
@@ -51,13 +51,21 @@ export function isPlainObject(obj) {
 }
 
 /**
- * whether null or undefined
- * @returns {boolean} - yes or no
+ * Capitalize first letter of a string
+ * @param {string} str
+ * @returns {string}
  */
-export function notNullorUndefined(d) {
-  return d !== undefined && d !== null;
-}
-
 export function capitalizeFirstLetter(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+/**
+ * Convert camel style names to title
+ * strokeColor -> Stroke Color
+ * @param {string} str
+ * @returns {string}
+ */
+export function camelToTitle(str){
+  const breakWord = str.replace( /([A-Z])/g, " $1" );
+  return capitalizeFirstLetter(breakWord);
 }

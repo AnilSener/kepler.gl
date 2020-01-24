@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -55,7 +55,11 @@ class MapboxLayerGL extends Layer {
   // this layer is rendered at mapbox level
   // todo: maybe need to find a better solution for this one
   shouldRenderLayer() {
-    return false;
+    return (
+      this.type &&
+      this.config.isVisible &&
+      this.hasAllColumns()
+    );
   }
 
 }

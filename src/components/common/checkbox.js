@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -93,6 +93,8 @@ export default class Checkbox extends Component {
       onBlur: this.handleBlur
     };
 
+    const {className = ''} = this.props;
+
     const labelProps = {
       ...pick(this.props, ['checked', 'disabled', 'secondary']),
       htmlFor: this.props.id
@@ -100,9 +102,9 @@ export default class Checkbox extends Component {
 
     const LabelElement = this.props.type === 'checkbox' ? StyledCheckboxInput : StyledSwitchInput;
     return (
-      <StyledCheckbox className="kg-checkbox">
+      <StyledCheckbox className={`kg-checkbox ${className}`}>
         <HiddenInput {...inputProps} />
-        <LabelElement chassName="kg-checkbox__label" {...labelProps}>
+        <LabelElement className="kg-checkbox__label" {...labelProps}>
           {this.props.label}
         </LabelElement>
       </StyledCheckbox>

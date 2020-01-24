@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@ import {WebMercatorViewport} from 'deck.gl';
 export function hexagonToPolygonGeo({object}, properties, radius, mapState) {
   const viewport = new WebMercatorViewport(mapState);
 
-  const screenCenter = viewport.projectFlat(object.centroid);
+  const screenCenter = viewport.projectFlat(object.position);
   const {pixelsPerMeter} = viewport.getDistanceScales();
   const pixRadius = radius * pixelsPerMeter[0];
 

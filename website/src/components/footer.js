@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,7 @@ import {cdnUrl} from '../utils';
 import {LinkButton} from './common/styled-components';
 import {media} from '../styles';
 import MapboxLogo from './mapbox-logo';
+import {DEMO_LINK} from '../constants';
 
 const Container = styled.div`
   background: #242730;
@@ -165,13 +166,13 @@ export default class Footer extends PureComponent {
         </LogosContainer>
         <ButtonSection>
           <ButtonContainer>
-            <LinkButton large href="#/demo">
+            <LinkButton large href={DEMO_LINK}>
               Get Started
             </LinkButton>
             <LinkButton
               large
               outlineDark
-              href="https://github.com/uber/kepler.gl"
+              href="https://github.com/keplergl/kepler.gl"
               style={{marginLeft: '5px'}}
             >
               <img src={cdnUrl('icons/github.svg')} /> Github

@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,32 +19,41 @@
 // THE SOFTWARE.
 
 // libraries
-import React, {Component} from 'react';
+import React, {Component, createRef} from 'react';
 import PropTypes from 'prop-types';
 import {createSelector} from 'reselect';
 import styled from 'styled-components';
 import {StaticMap} from 'react-map-gl';
 import debounce from 'lodash.debounce';
-import window from 'global/window';
-
+import {exportImageError} from 'utils/notifications-utils';
 import MapContainerFactory from './map-container';
 import {calculateExportImageSize, convertToPng} from 'utils/export-image-utils';
 import {scaleMapStyleByResolution} from 'utils/map-style-utils/mapbox-gl-style-editor';
+
 const propTypes = {
   width: PropTypes.number.isRequired,
   height: PropTypes.number.isRequired,
   exportImageSetting: PropTypes.object.isRequired,
+  addNotification: PropTypes.func.isRequired,
   mapFields: PropTypes.object.isRequired
 };
 
 PlotContainerFactory.deps = [MapContainerFactory];
 
+// Remove mapbox logo in exported map, because it contains non-ascii characters
 const StyledPlotContainer = styled.div`
   .mapboxgl-ctrl-bottom-left,
   .mapboxgl-ctrl-bottom-right {
     display: none;
   }
 `;
+
+const deckGlProps = {
+  glOptions: {
+    preserveDrawingBuffer: true,
+    useDevicePixels: false
+  }
+};
 
 export default function PlotContainerFactory(MapContainer) {
   class PlotContainer extends Component {
@@ -70,12 +79,15 @@ export default function PlotContainerFactory(MapContainer) {
       }
     }
 
+    plottingAreaRef = createRef();
+
     mapStyleSelector = props => props.mapFields.mapStyle;
     resolutionSelector = props => props.exportImageSetting.resolution;
     scaledMapStyleSelector = createSelector(
       this.mapStyleSelector,
       this.resolutionSelector,
       (mapStyle, resolution) => ({
+        ...mapStyle,
         bottomMapStyle: scaleMapStyleByResolution(
           mapStyle.bottomMapStyle,
           resolution
@@ -91,16 +103,16 @@ export default function PlotContainerFactory(MapContainer) {
     };
 
     _retrieveNewScreenshot = () => {
-      if (this.plottingAreaRef) {
-      // setting windowDevicePixelRatio to 1
-      // so that large mapbox base map will load in full
-        const savedDevicePixelRatio = window.devicePixelRatio;
-        window.devicePixelRatio = 1;
-
+      if (this.plottingAreaRef.current) {
         this.props.startExportingImage();
-        convertToPng(this.plottingAreaRef).then(dataUri => {
-          this.props.setExportImageDataUri({dataUri});
-          window.devicePixelRatio = savedDevicePixelRatio;
+        const filter = node => node.className !== 'mapboxgl-control-container';
+
+        convertToPng(this.plottingAreaRef.current, {filter}).then(dataUri => {
+          this.props.setExportImageDataUri(dataUri);
+        })
+        .catch(err => {
+          this.props.setExportImageError(err);
+          this.props.addNotification(exportImageError({err}));
         });
       }
     };
@@ -140,9 +152,7 @@ export default function PlotContainerFactory(MapContainer) {
           style={{position: 'absolute', top: -9999, left: -9999}}
         >
           <div
-            ref={element => {
-              this.plottingAreaRef = element;
-            }}
+            ref={this.plottingAreaRef}
             style={{
               width: exportImageSize.width,
               height: exportImageSize.height
@@ -152,6 +162,7 @@ export default function PlotContainerFactory(MapContainer) {
               index={0}
               onMapRender={this._onMapRender}
               isExport
+              deckGlProps={deckGlProps}
               {...mapProps}
             />
           </div>

@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -21,8 +21,9 @@
 import pick from 'lodash.pick';
 import {VERSIONS} from './versions';
 import {isValidFilterValue} from 'utils/filter-utils';
-
+import {LAYER_VIS_CONFIGS} from 'layers/layer-factory';
 import Schema from './schema';
+import cloneDeep from 'lodash.clonedeep';
 
 /**
  * V0 Schema
@@ -66,7 +67,7 @@ function geojsonSizeFieldV0ToV1(config) {
 // convert v0 to v1 layer config
 class DimensionFieldSchemaV0 extends Schema {
   version = VERSIONS.v0;
-  save(field, config) {
+  save(field) {
     // should not be called anymore
     return {
       [this.key]:
@@ -76,7 +77,8 @@ class DimensionFieldSchemaV0 extends Schema {
     };
   }
 
-  load(field, config, accumulated) {
+  load(field, parents, accumulated) {
+    const [config] = parents.slice(-1);
     let fieldName = this.key;
     if (config.type === 'geojson' && this.key === 'sizeField' && field) {
       fieldName = geojsonSizeFieldV0ToV1(config);
@@ -96,7 +98,8 @@ class DimensionScaleSchemaV0 extends Schema {
   save(scale) {
     return {[this.key]: scale};
   }
-  load(scale, config, accumulated) {
+  load(scale, parents, accumulated) {
+    const [config] = parents.slice(-1);
     // fold into visualChannels to be load by VisualChannelSchemaV1
     if (this.key === 'sizeScale' && config.type === 'geojson') {
       // sizeScale now split into radiusScale, heightScale
@@ -116,7 +119,7 @@ class DimensionScaleSchemaV0 extends Schema {
 // used to convert v0 to v1 layer config
 class LayerConfigSchemaV0 extends Schema {
   version = VERSIONS.v0;
-  load(saved, layer, accumulated) {
+  load(saved, parents, accumulated) {
     // fold v0 layer property into config.key
     return {
       config: {
@@ -131,7 +134,7 @@ class LayerConfigSchemaV0 extends Schema {
 // only return column value for each column
 class LayerColumnsSchemaV0 extends Schema {
   version = VERSIONS.v0;
-  load(saved, layer, accumulated) {
+  load(saved, parents, accumulated) {
     // fold v0 layer property into config.key, flatten columns
     return {
       config: {
@@ -151,7 +154,7 @@ class LayerColumnsSchemaV0 extends Schema {
 // used to convert v0 to v1 layer config.visConfig
 class LayerConfigToVisConfigSchemaV0 extends Schema {
   version = VERSIONS.v0;
-  load(saved, layer, accumulated) {
+  load(saved, parents, accumulated) {
     // fold v0 layer property into config.visConfig
     const accumulatedConfig = accumulated.config || {};
     return {
@@ -170,7 +173,8 @@ class LayerVisConfigSchemaV0 extends Schema {
   version = VERSIONS.v0;
   key = 'visConfig';
 
-  load(visConfig, config, accumulator) {
+  load(visConfig, parents, accumulator) {
+    const [config] = parents.slice(-1);
     const rename = {
       geojson: {
         extruded: 'enable3d',
@@ -290,12 +294,67 @@ class ColumnSchemaV1 extends Schema {
   }
 }
 
+class TextLabelSchemaV1 extends Schema {
+  save(textLabel) {
+    return {
+      [this.key]: textLabel.map(tl => ({
+        ...tl,
+        field: tl.field ? pick(tl.field, ['name', 'type']) : null
+      }))
+    };
+  }
+
+  load(textLabel) {
+    return {textLabel: Array.isArray(textLabel) ? textLabel : [textLabel]};
+  }
+}
+
+const visualChannelModificationV1 = {
+  point: (vc, parents, accumulator) => {
+    const [layer] = parents.slice(-1);
+
+    if (
+      layer.config.visConfig.outline &&
+      vc.colorField &&
+      !vc.hasOwnProperty('strokeColorField')
+    ) {
+      // point layer now supports both outline and fill
+      // for older schema where filled has not been added to point layer
+      // copy colorField, colorScale to strokeColorField, and strokeColorScale
+      return {
+        strokeColorField: vc.colorField,
+        strokeColorScale: vc.colorScale,
+        colorField: null,
+        colorScale: 'quantile'
+      };
+    }
+    return {};
+  },
+  geojson: (vc, parents, accumulator) => {
+    const [layer] = parents.slice(-1);
+    const isOld = !vc.hasOwnProperty('strokeColorField');
+    // make our best guess if this geojson layer contains point
+    const isPoint =
+      vc.radiusField ||
+      layer.config.visConfig.radius !== LAYER_VIS_CONFIGS.radius.defaultValue;
+
+    if (isOld && !isPoint && layer.config.visConfig.stroked) {
+      // if stroked is true, copy color config to stroke color config
+      return {
+        strokeColorField: vc.colorField,
+        strokeColorScale: vc.colorScale
+      };
+    }
+    return {};
+  }
+};
 /**
  * V1: save [field]: {name, type}, [scale]: '' for each channel
  */
 class VisualChannelSchemaV1 extends Schema {
-  save(visualChannels, layer) {
+  save(visualChannels, parents) {
     // only save field and scale of each channel
+    const [layer] = parents.slice(-1);
     return {
       [this.key]: Object.keys(visualChannels).reduce(
         //  save channel to null if didn't select any field
@@ -310,13 +369,82 @@ class VisualChannelSchemaV1 extends Schema {
       )
     };
   }
-  load(vc, layer, accumulator) {
+  load(vc, parents, accumulator) {
     // fold channels into config
+    const [layer] = parents.slice(-1);
+    const modified = visualChannelModificationV1[layer.type]
+      ? visualChannelModificationV1[layer.type](vc, parents, accumulator)
+      : {};
+
     return {
       ...accumulator,
       config: {
         ...(accumulator.config || {}),
-        ...vc
+        ...vc,
+        ...modified
+      }
+    };
+  }
+}
+const visConfigModificationV1 = {
+  point: (visConfig, parents, accumulated) => {
+    const modified = {};
+    const [layer] = parents.slice(-2, -1);
+    const isOld = !visConfig.hasOwnProperty('filled') &&
+    !visConfig.strokeColor && !visConfig.strokeColorRange;
+    if (isOld) {
+      // color color & color range to stroke color
+      modified.strokeColor = layer.config.color;
+      modified.strokeColorRange = cloneDeep(visConfig.colorRange);
+      if (visConfig.outline) {
+        // point layer now supports both outline and fill
+        // for older schema where filled has not been added to point layer
+        // set it to false
+        modified.filled = false;
+      }
+    }
+
+    return modified;
+  },
+  geojson: (visConfig, parents, accumulated) => {
+    // is points?
+    const modified = {};
+    const [layer] = parents.slice(-2, -1);
+    const isOld = !layer.visualChannels.hasOwnProperty('strokeColorField') &&
+      !visConfig.strokeColor && !visConfig.strokeColorRange;
+    // make our best guess if this geojson layer contains point
+    const isPoint =
+      layer.visualChannels.radiusField ||
+      visConfig.radius !== LAYER_VIS_CONFIGS.radius.defaultValue;
+
+    if (isOld) {
+      // color color & color range to stroke color
+      modified.strokeColor = layer.config.color;
+      modified.strokeColorRange = cloneDeep(visConfig.colorRange);
+      if (isPoint) {
+        // if is point, set stroke to false
+        modified.filled = true;
+        modified.stroked = false;
+      }
+    }
+
+    return modified;
+  }
+};
+
+class VisConfigSchemaV1 extends Schema {
+  key = 'visConfig';
+
+  load(visConfig, parents, accumulated) {
+    const [layer] = parents.slice(-2, -1);
+    const modified = visConfigModificationV1[layer.type]
+      ? visConfigModificationV1[layer.type](visConfig, parents, accumulated)
+      : {};
+
+    return {
+      visConfig: {
+        ...visConfig,
+        ...modified
       }
     };
   }
@@ -337,7 +465,13 @@ export const layerPropsV1 = {
         key: 'columns'
       }),
       isVisible: null,
-      visConfig: null
+      visConfig: new VisConfigSchemaV1({
+        version: VERSIONS.v1
+      }),
+      textLabel: new TextLabelSchemaV1({
+        version: VERSIONS.v1,
+        key: 'textLabel'
+      })
     }
   }),
   visualChannels: new VisualChannelSchemaV1({
@@ -349,7 +483,9 @@ export const layerPropsV1 = {
 class LayerSchemaV0 extends Schema {
   key = 'layers';
 
-  save(layers, visState) {
+  save(layers, parents) {
+    const [visState] = parents.slice(-1);
+
     return {
       [this.key]: visState.layerOrder.reduce((saved, index) => {
         // save layers according to their rendering order
@@ -362,7 +498,7 @@ class LayerSchemaV0 extends Schema {
     };
   }
 
-  load(layers, visState) {
+  load(layers) {
     return {
       [this.key]: layers.map(
         layer => this.loadPropertiesOrApplySchema(layer, layers).layers
@@ -377,10 +513,7 @@ class FilterSchemaV0 extends Schema {
     return {
       filters: filters
         .filter(isValidFilterValue)
-        .map(
-          filter =>
-            this.savePropertiesOrApplySchema(filter, this.properties).filters
-        )
+        .map(filter => this.savePropertiesOrApplySchema(filter).filters)
     };
   }
   load(filters) {
@@ -472,6 +605,39 @@ export class DimensionFieldSchema extends Schema {
   }
 }
 
+export class SplitMapsSchema extends Schema {
+  convertLayerSettings(accu, [key, value]) {
+    if (typeof value === 'boolean') {
+      return {
+        ...accu,
+        [key]: value
+      };
+    } else if (value && typeof value === 'object' && value.isAvailable) {
+      return {
+        ...accu,
+        [key]: Boolean(value.isVisible)
+      };
+    }
+    return accu;
+  }
+
+  load(splitMaps) {
+    // previous splitMaps Schema {layers: {layerId: {isVisible, isAvailable}}}
+
+    if (!Array.isArray(splitMaps) || !splitMaps.length) {
+      return {splitMaps: []};
+    }
+
+    return {
+      splitMaps: splitMaps.map(settings => ({
+        ...settings,
+        layers: Object.entries(settings.layers || {})
+          .reduce(this.convertLayerSettings, {})
+      }))
+    }
+  }
+}
+
 export const filterPropsV1 = {
   ...filterPropsV0,
   plotType: null,
@@ -515,7 +681,10 @@ export const propertiesV1 = {
     properties: interactionPropsV0
   }),
   layerBlending: null,
-  splitMaps: null
+  splitMaps: new SplitMapsSchema({
+    key: 'splitMaps',
+    version: VERSIONS.v1
+  })
 };
 
 export const visStateSchemaV0 = new Schema({

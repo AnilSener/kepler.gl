@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -39,8 +39,7 @@ const CustomMapStyleSchema = new Schema({
 class MapStyleSchemaV1 extends Schema {
   version = VERSIONS.v1;
   key = 'mapStyles';
-  save(mapStyles, mapStyle) {
-
+  save(mapStyles) {
     // save all custom styles
     const saveCustomStyle = Object.keys(mapStyles).reduce((accu, key) => ({
       ...(mapStyles[key].custom ?
@@ -52,7 +51,8 @@ class MapStyleSchemaV1 extends Schema {
   }
 
   load(mapStyles) {
-    return {[this.key]: mapStyles}
+    // If mapStyle is an empty object, do not load it
+    return typeof mapStyles === 'object' && Object.keys(mapStyles).length ? {[this.key]: mapStyles} : {};
   }
 }
 
@@ -65,6 +65,14 @@ export const propertiesV0 = {
   mapStyles: new MapStyleSchemaV1()
 };
 
+export const propertiesV1 = {
+  styleType: null,
+  topLayerGroups: null,
+  visibleLayerGroups: null,
+  threeDBuildingColor: null,
+  mapStyles: new MapStyleSchemaV1()
+};
+
 const mapStyleSchema = {
   [VERSIONS.v0]: new Schema({
     version: VERSIONS.v0,
@@ -73,7 +81,7 @@ const mapStyleSchema = {
   }),
   [VERSIONS.v1]: new Schema({
     version: VERSIONS.v1,
-    properties: propertiesV0,
+    properties: propertiesV1,
     key: 'mapStyle'
   })
 };

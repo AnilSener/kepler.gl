@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -18,7 +18,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import Immutable from 'immutable';
 import cloneDeep from 'lodash.clonedeep';
 import {VizColorPalette} from 'constants/custom-color-ranges';
 import {getInitialInputStyle} from 'reducers/map-style-updaters';
@@ -26,6 +25,8 @@ import {getInitialInputStyle} from 'reducers/map-style-updaters';
 import keplerGlReducer from 'reducers/core';
 import * as VisStateActions from 'actions/vis-state-actions';
 import * as MapStyleActions from 'actions/map-style-actions';
+import * as MapStateActions from 'actions/map-state-actions';
+import {DEFAULT_TEXT_LABEL} from 'layers/layer-factory';
 
 // fixtures
 import {testFields, testAllData} from 'test/fixtures/test-csv-data';
@@ -60,23 +61,14 @@ export function applyActions(reducer, initialState, actions) {
   );
 }
 
-/**
- * Mock Initial App Sate
- * @returns {Immutable} appState
- */
-export function mockInitialState() {
-  const initialState = keplerGlReducer(undefined, {});
-  return Immutable.fromJS(initialState);
-}
-
-export const InitialState = mockInitialState();
+export const InitialState = keplerGlReducer(undefined, {});
 
 /**
  * Mock app state with uploaded geojson and csv file
  * @returns {Immutable} appState
  */
 function mockStateWithFileUpload() {
-  const initialState = InitialState.toJS();
+  const initialState = cloneDeep(InitialState);
 
   // load csv and geojson
   const updatedState = applyActions(keplerGlReducer, initialState, [
@@ -94,18 +86,20 @@ function mockStateWithFileUpload() {
     }
   ]);
 
-  // replace layer id and color with controlled value for easy testing
+  // replace layer id and color with controlled value for testing
   updatedState.visState.layers.forEach((l, i) => {
     l.id = `${l.type}-${i}`;
-    l.config.color = [i, i, i]
+    l.config.color = [i, i, i];
+    if (l.config.visConfig.strokeColor) {
+      l.config.visConfig.strokeColor = [i + 10, i + 10, i + 10];
+    }
   });
 
-  return Immutable.fromJS(updatedState);
+  return updatedState;
 }
 
 function mockStateWithFilters(state) {
-  const initialState =
-    (state && state.toJS()) || mockStateWithFileUpload().toJS();
+  const initialState = state || mockStateWithFileUpload();
 
   const prepareState = applyActions(keplerGlReducer, initialState, [
     // add filter
@@ -135,12 +129,11 @@ function mockStateWithFilters(state) {
     f.id = `${f.name}-${i}`;
   });
 
-  return Immutable.fromJS(prepareState);
+  return prepareState;
 }
 
 function mockStateWithLayerDimensions(state) {
-  const initialState =
-    (state && state.toJS()) || mockStateWithFileUpload().toJS();
+  const initialState = state || mockStateWithFileUpload();
 
   const layer0 = initialState.visState.layers.find(
     l => l.config.dataId === '190vdll3di' && l.type === 'point'
@@ -150,12 +143,29 @@ function mockStateWithLayerDimensions(state) {
     f => f.name === 'gps_data.types'
   );
 
-  const colorFieldpayload = [layer0, {colorField}, 'color'];
+  const colorFieldPayload = [layer0, {colorField}, 'color'];
 
   const colorRangePayload = [
     layer0,
     {colorRange: VizColorPalette.find(c => c.name === 'Uber Viz Sequential 2')},
     'color'
+  ];
+
+  const textLabelField = initialState.visState.datasets['190vdll3di'].fields.find(
+    f => f.name === 'date'
+  );
+
+  const textLabelPayload1 = [
+    layer0,
+    0,
+    'field',
+    textLabelField
+  ];
+  const textLabelPayload2 = [
+    layer0,
+    0,
+    'color',
+    [255, 0, 0]
   ];
 
   // layers = [ 'point', 'geojson', 'hexagon' ]
@@ -165,14 +175,21 @@ function mockStateWithLayerDimensions(state) {
     // change colorField
     {
       action: VisStateActions.layerVisualChannelConfigChange,
-      payload: colorFieldpayload
+      payload: colorFieldPayload
     },
 
     // change colorRange
     {action: VisStateActions.layerVisConfigChange, payload: colorRangePayload},
 
+    // change textLabel
+    {action: VisStateActions.layerTextLabelChange, payload: textLabelPayload1},
+    {action: VisStateActions.layerTextLabelChange, payload: textLabelPayload2},
+
     // add layer
-    {action: VisStateActions.addLayer, payload: [{id: 'hexagon-2', color: [2, 2, 2]}]}
+    {
+      action: VisStateActions.addLayer,
+      payload: [{id: 'hexagon-2', color: [2, 2, 2]}]
+    }
   ]);
 
   const newLayer = prepareState.visState.layers[2];
@@ -205,20 +222,23 @@ function mockStateWithLayerDimensions(state) {
     {action: VisStateActions.reorderLayer, payload: reorderPayload}
   ]);
 
-  return Immutable.fromJS(resultState);
+  return resultState;
 }
 
-function mockStateWithCustomMapStyle(state) {
-  const initialState = InitialState.toJS();
+function mockStateWithCustomMapStyle() {
+  const initialState = cloneDeep(InitialState);
   const testCustomMapStyle = {
     ...getInitialInputStyle(),
     accessToken: 'secret_token',
     isValid: true,
     label: 'Smoothie the Cat',
     icon: 'data:image/png;base64,xyz',
-    style: {version: 'v8', id: 'smoothie_the_cat', layers: [
-      {id: 'background'}, {id: 'road'}, {id: 'label'}
-    ], name: 'Smoothie the Cat'},
+    style: {
+      version: 'v8',
+      id: 'smoothie_the_cat',
+      layers: [{id: 'background'}, {id: 'road'}, {id: 'label'}],
+      name: 'Smoothie the Cat'
+    },
     url: 'mapbox://styles/shanhe/smoothie.the.cat'
   };
 
@@ -230,17 +250,39 @@ function mockStateWithCustomMapStyle(state) {
     },
     {
       action: MapStyleActions.loadCustomMapStyle,
-      payload: [{
-        style: testCustomMapStyle.style
-      }]
+      payload: [
+        {
+          style: testCustomMapStyle.style
+        }
+      ]
     },
     {
       action: MapStyleActions.addCustomMapStyle,
       payload: [{}]
     },
+    {
+      action: MapStyleActions.set3dBuildingColor,
+      payload: [[1, 2, 3]]
+    }
   ]);
 
-  return Immutable.fromJS(updatedState);
+  return updatedState;
+}
+
+function mockStateWithSplitMaps(state) {
+  const initialState = state || mockStateWithFileUpload();
+
+  const firstLayer = initialState.visState.layers[0];
+
+  const prepareState = applyActions(keplerGlReducer, initialState, [
+    // toggle splitMaps
+    {action: MapStateActions.toggleSplitMap, payload: []},
+
+    // toggleLayerForMap
+    {action: VisStateActions.toggleLayerForMap, payload: [0, firstLayer.id]}
+  ]);
+
+  return prepareState;
 }
 
 export const StateWFiles = mockStateWithFileUpload();
@@ -250,7 +292,7 @@ export const StateWFilesFiltersLayerColor = mockStateWithLayerDimensions(
 );
 
 export const StateWCustomMapStyle = mockStateWithCustomMapStyle();
-
+export const StateWSplitMaps = mockStateWithSplitMaps();
 // saved hexagon layer
 export const expectedSavedLayer0 = {
   id: 'hexagon-2',
@@ -286,11 +328,11 @@ export const expectedSavedLayer0 = {
       percentile: [0, 100],
       elevationPercentile: [0, 100],
       elevationScale: 5,
-      'hi-precision': false,
       colorAggregation: 'count',
       sizeAggregation: 'count',
       enable3d: false
-    }
+    },
+    textLabel: [DEFAULT_TEXT_LABEL]
   },
   visualChannels: {
     colorField: null,
@@ -334,7 +376,6 @@ export const expectedLoadedLayer0 = {
       percentile: [0, 100],
       elevationPercentile: [0, 100],
       elevationScale: 5,
-      'hi-precision': false,
       colorAggregation: 'count',
       sizeAggregation: 'count',
       enable3d: false
@@ -342,7 +383,8 @@ export const expectedLoadedLayer0 = {
     colorField: null,
     colorScale: 'quantile',
     sizeField: null,
-    sizeScale: 'linear'
+    sizeScale: 'linear',
+    textLabel: [DEFAULT_TEXT_LABEL]
   }
 };
 
@@ -358,29 +400,36 @@ export const expectedSavedLayer1 = {
       lng: 'gps_data.lng',
       altitude: null
     },
+    textLabel: [{
+      ...DEFAULT_TEXT_LABEL,
+      field: {
+        name: 'date',
+        type: 'date'
+      },
+      color: [255, 0, 0]
+    }],
     isVisible: true,
     visConfig: {
       radius: 10,
       fixedRadius: false,
       opacity: 0.8,
       outline: false,
+      filled: true,
       thickness: 2,
       colorRange: {
         name: 'Uber Viz Sequential 2',
         type: 'sequential',
         category: 'Uber',
-        colors: [
-          '#E6FAFA',
-          '#AAD7DA',
-          '#68B4BB',
-          '#00939C'
-        ]
+        colors: ['#E6FAFA', '#AAD7DA', '#68B4BB', '#00939C']
       },
-      radiusRange: [
-        0,
-        50
-      ],
-      'hi-precision': false
+      strokeColorRange: {
+        name: 'Global Warming',
+        type: 'sequential',
+        category: 'Uber',
+        colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
+      },
+      strokeColor: null,
+      radiusRange: [0, 50]
     }
   },
   visualChannels: {
@@ -390,7 +439,9 @@ export const expectedSavedLayer1 = {
     },
     colorScale: 'ordinal',
     sizeField: null,
-    sizeScale: 'linear'
+    sizeScale: 'linear',
+    strokeColorField: null,
+    strokeColorScale: 'quantile'
   }
 };
 
@@ -417,45 +468,57 @@ export const expectedLoadedLayer1 = {
         name: 'Uber Viz Sequential 2',
         type: 'sequential',
         category: 'Uber',
-        colors: [
-          '#E6FAFA',
-          '#AAD7DA',
-          '#68B4BB',
-          '#00939C'
-        ]
+        colors: ['#E6FAFA', '#AAD7DA', '#68B4BB', '#00939C']
       },
-      radiusRange: [0, 50],
-      'hi-precision': false
+      strokeColorRange: {
+        name: 'Global Warming',
+        type: 'sequential',
+        category: 'Uber',
+        colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
+      },
+      filled: true,
+      strokeColor: null,
+      radiusRange: [0, 50]
     },
     colorField: {
       name: 'gps_data.types',
       type: 'string'
     },
     colorScale: 'ordinal',
+    strokeColorField: null,
+    strokeColorScale: 'quantile',
     sizeField: null,
-    sizeScale: 'linear'
+    sizeScale: 'linear',
+    textLabel: [{
+      ...DEFAULT_TEXT_LABEL,
+      field: {
+        name: 'date',
+        type: 'date'
+      },
+      color: [255, 0, 0]
+    }]
   }
 };
 
 export const expectedSavedLayer2 = {
-  id :'geojson-1',
-  type :'geojson',
-  config :{
-    dataId :'ieukmgne',
-    label :'zip',
-    color :[1, 1, 1],
-    columns :{
-      geojson :'_geojson'
+  id: 'geojson-1',
+  type: 'geojson',
+  config: {
+    dataId: 'ieukmgne',
+    label: 'zip',
+    color: [1, 1, 1],
+    columns: {
+      geojson: '_geojson'
     },
-    isVisible :true,
-    visConfig :{
-      opacity :0.8,
-      thickness :2,
-      colorRange :{
-        name :'Global Warming',
-        type :'sequential',
-        category :'Uber',
-        colors :[
+    isVisible: true,
+    visConfig: {
+      opacity: 0.8,
+      thickness: 0.5,
+      colorRange: {
+        name: 'Global Warming',
+        type: 'sequential',
+        category: 'Uber',
+        colors: [
           '#5A1846',
           '#900C3F',
           '#C70039',
@@ -464,27 +527,36 @@ export const expectedSavedLayer2 = {
           '#FFC300'
         ]
       },
-      radius :10,
-      sizeRange :[0, 10],
-      radiusRange :[0, 50],
-      heightRange :[0, 500],
-      elevationScale :5,
-      'hi-precision' :false,
-      stroked :true,
-      filled :false,
-      enable3d :false,
-      wireframe :false
-    }
+      strokeColorRange: {
+        name: 'Global Warming',
+        type: 'sequential',
+        category: 'Uber',
+        colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
+      },
+      strokeColor: [11, 11, 11],
+      radius: 10,
+      sizeRange: [0, 10],
+      radiusRange: [0, 50],
+      heightRange: [0, 500],
+      elevationScale: 5,
+      stroked: true,
+      filled: true,
+      enable3d: false,
+      wireframe: false
+    },
+    textLabel: [DEFAULT_TEXT_LABEL]
   },
-  visualChannels :{
-    colorField :null,
-    colorScale :'quantile',
-    sizeField :null,
-    sizeScale :'linear',
-    heightField :null,
-    heightScale :'linear',
-    radiusField :null,
-    radiusScale :'linear'
+  visualChannels: {
+    colorField: null,
+    colorScale: 'quantile',
+    strokeColorField: null,
+    strokeColorScale: 'quantile',
+    sizeField: null,
+    sizeScale: 'linear',
+    heightField: null,
+    heightScale: 'linear',
+    radiusField: null,
+    radiusScale: 'linear'
   }
 };
 
@@ -501,7 +573,7 @@ export const expectedLoadedLayer2 = {
     isVisible: true,
     visConfig: {
       opacity: 0.8,
-      thickness: 2,
+      thickness: 0.5,
       colorRange: {
         name: 'Global Warming',
         type: 'sequential',
@@ -515,24 +587,33 @@ export const expectedLoadedLayer2 = {
           '#FFC300'
         ]
       },
+      strokeColorRange: {
+        name: 'Global Warming',
+        type: 'sequential',
+        category: 'Uber',
+        colors: ['#5A1846', '#900C3F', '#C70039', '#E3611C', '#F1920E', '#FFC300']
+      },
+      strokeColor: [11, 11, 11],
       radius: 10,
       sizeRange: [0, 10],
       radiusRange: [0, 50],
       heightRange: [0, 500],
       elevationScale: 5,
-      'hi-precision': false,
       stroked: true,
-      filled: false,
+      filled: true,
       enable3d: false,
       wireframe: false
     },
     colorField: null,
     colorScale: 'quantile',
+    strokeColorField: null,
+    strokeColorScale: 'quantile',
     sizeField: null,
     sizeScale: 'linear',
     heightField: null,
     heightScale: 'linear',
     radiusField: null,
-    radiusScale: 'linear'
+    radiusScale: 'linear',
+    textLabel: [DEFAULT_TEXT_LABEL]
   }
 };

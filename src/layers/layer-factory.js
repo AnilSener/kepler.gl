@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -124,10 +124,11 @@ export const LAYER_VIS_CONFIGS = {
     group: PROPERTY_GROUPS.cell,
     property: 'coverage'
   },
+  // used in point layer
   outline: {
     type: 'boolean',
     defaultValue: false,
-    label: 'Draw outline',
+    label: 'Outline',
     group: PROPERTY_GROUPS.display,
     property: 'outline'
   },
@@ -138,12 +139,26 @@ export const LAYER_VIS_CONFIGS = {
     group: PROPERTY_GROUPS.color,
     property: 'colorRange'
   },
+  strokeColorRange: {
+    type: 'color-range-select',
+    defaultValue: DefaultColorRange,
+    label: 'Stroke Color range',
+    group: PROPERTY_GROUPS.color,
+    property: 'strokeColorRange'
+  },
   targetColor: {
     type: 'color-select',
     label: 'Target Color',
     defaultValue: null,
     group: PROPERTY_GROUPS.color,
     property: 'targetColor'
+  },
+  strokeColor: {
+    type: 'color-select',
+    label: 'Stroke Color',
+    defaultValue: null,
+    group: PROPERTY_GROUPS.color,
+    property: 'strokeColor'
   },
   aggregation: {
     type: 'select',
@@ -210,13 +225,33 @@ export const LAYER_VIS_CONFIGS = {
     group: PROPERTY_GROUPS.cell,
     property: 'resolution'
   },
+  sizeScale: {
+    type: 'number',
+    defaultValue: 10,
+    label: 'Size Scale',
+    isRanged: false,
+    range: [1, 1000],
+    step: 1,
+    // group: PROPERTY_GROUPS.cell,
+    property: 'sizeScale'
+  },
+  angle: {
+    type: 'number',
+    defaultValue: 0,
+    // label: 'Size Scale',
+    isRanged: false,
+    range: [0, 360],
+    step: 1
+    // group: PROPERTY_GROUPS.cell,
+    // property: 'sizeScale'
+  },
   worldUnitSize: {
     type: 'number',
     defaultValue: 1,
     label: 'World Unit Size',
     isRanged: false,
-    range: [0.01, 500],
-    step: 0.01,
+    range: [0, 500],
+    step: 0.0001,
     group: PROPERTY_GROUPS.cell,
     property: 'worldUnitSize'
   },
@@ -240,6 +275,17 @@ export const LAYER_VIS_CONFIGS = {
     group: PROPERTY_GROUPS.height,
     property: 'sizeRange'
   },
+  coverageRange: {
+    type: 'number',
+    defaultValue: [0, 1],
+    label: 'Coverage Range',
+    isRanged: true,
+    range: [0, 1],
+    step: 0.01,
+    group: PROPERTY_GROUPS.radius,
+    property: 'coverageRange'
+  },
+  // hi precision is deprecated by deck.gl
   'hi-precision': {
     type: 'boolean',
     defaultValue: false,
@@ -251,21 +297,21 @@ export const LAYER_VIS_CONFIGS = {
   enable3d: {
     type: 'boolean',
     defaultValue: false,
-    label: 'Enable Height',
+    label: 'Height',
     group: PROPERTY_GROUPS.height,
     property: 'enable3d',
     description: 'Click button at top right of the map to switch to 3d view'
   },
   stroked: {
     type: 'boolean',
-    label: 'Polygon Stroke',
+    label: 'Stroke',
     defaultValue: true,
     group: PROPERTY_GROUPS.display,
     property: 'stroked'
   },
   filled: {
     type: 'boolean',
-    label: 'Polygon Fill',
+    label: 'Fill',
     defaultValue: false,
     group: PROPERTY_GROUPS.display,
     property: 'filled'
@@ -306,4 +352,37 @@ export const LAYER_VIS_CONFIGS = {
     group: PROPERTY_GROUPS.cell,
     property: 'radius'
   }
+};
+
+export const LAYER_TEXT_CONFIGS = {
+  fontSize: {
+    type: 'number',
+    range: [1, 100],
+    value0: 1,
+    step: 1,
+    isRanged: false,
+    label: 'Font size',
+    showInput: true
+  },
+  textAnchor: {
+    type: 'select',
+    options: ['start', 'middle', 'end'],
+    multiSelect: false,
+    searchable: false
+  },
+  textAlignment: {
+    type: 'select',
+    options: ['top', 'center', 'bottom'],
+    multiSelect: false,
+    searchable: false
+  }
+};
+
+export const DEFAULT_TEXT_LABEL = {
+  field: null,
+  color: [255, 255, 255],
+  size: 18,
+  offset: [0, 0],
+  anchor: 'start',
+  alignment: 'center'
 };

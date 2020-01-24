@@ -1,4 +1,4 @@
-// Copyright (c) 2018 Uber Technologies, Inc.
+// Copyright (c) 2019 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -19,21 +19,62 @@
 // THE SOFTWARE.
 
 import keyMirror from 'keymirror';
+import {EditorModes} from 'react-map-gl-draw';
 
 export const ACTION_PREFIX = '@@kepler.gl/';
 export const CLOUDFRONT = 'https://d1a3f4spazzrp4.cloudfront.net/kepler.gl';
-export const STYLE_PREFIX = `${CLOUDFRONT}/map-styles`;
 export const ICON_PREFIX = `${CLOUDFRONT}/geodude`;
 
 // Modal Ids
-export const LAYER_CONFIG_ID = 'copyConfig';
+/**
+ * Modal id: data table
+ * @constant
+ * @type {string}
+ * @public
+ */
 export const DATA_TABLE_ID = 'dataTable';
+/**
+ * Modal id: delete dataset confirm dialog
+ * @constant
+ * @type {string}
+ * @public
+ */
 export const DELETE_DATA_ID = 'deleteData';
+/**
+ * Modal id: add data modal
+ * @constant
+ * @type {string}
+ * @public
+ */
 export const ADD_DATA_ID = 'addData';
+/**
+ * Modal id: export image modal
+ * @constant
+ * @type {string}
+ * @public
+ */
 export const EXPORT_IMAGE_ID = 'exportImage';
+/**
+ * Modal id: export data modal
+ * @constant
+ * @type {string}
+ * @public
+ */
 export const EXPORT_DATA_ID = 'exportData';
-export const EXPORT_CONFIG_ID = 'exportConfig';
+/**
+ * Modal id: add custom map style modal
+ * @constant
+ * @type {string}
+ * @public
+ */
 export const ADD_MAP_STYLE_ID = 'addMapStyle';
+/**
+ * Modal id: export map modal
+ * @constant
+ * @type {string}
+ * @public
+ */
+export const EXPORT_MAP_ID = 'exportMap';
 
 import {
   Layers,
@@ -43,7 +84,13 @@ import {
 } from 'components/common/icons';
 
 export const KEPLER_GL_NAME = 'kepler.gl';
-export const KEPLER_GL_VERSION = 'v1.0';
+
+// __PACKAGE_VERSION__ is automatically injected by Babel/Webpack during the building process
+// Since we are injecting this during the build process with babel
+// while developing VERSION is not defined, we capture the exception and return
+// an empty string which will allow us to retrieve the latest umd version
+export const KEPLER_GL_VERSION = "__PACKAGE_VERSION__";
+export const KEPLER_GL_WEBSITE = 'http://kepler.gl/';
 
 export const DIMENSIONS = {
   sidePanel: {
@@ -56,6 +103,22 @@ export const DIMENSIONS = {
     padding: 12
   }
 };
+
+/**
+ * Theme name that can be passed to `KeplerGl` `prop.theme`.
+ * Available themes are `Theme.light` and `Theme.dark`. Default theme is `Theme.dark`
+ * @constant
+ * @type {string}
+ * @public
+ * @example
+ * ```js
+ * const Map = () => <KeplerGl theme={THEME.light} id="map"/>
+ * ```
+ */
+export const THEME = keyMirror({
+  light: null,
+  dark: null
+});
 
 export const PANELS = [
   {
@@ -77,14 +140,6 @@ export const PANELS = [
     id: 'map',
     label: 'Base map',
     iconComponent: Settings
-  }
-];
-
-export const PANELS_FOOTER = [
-  {
-    id: LAYER_CONFIG_ID,
-    label: 'Copy Config',
-    icon: 'clipboard'
   }
 ];
 
@@ -120,6 +175,11 @@ export const DEFAULT_LAYER_GROUPS = [
     slug: 'land',
     filter: ({id}) => id.match(/(?=(parks|landcover|industrial|sand|hillshade))/),
     defaultVisibility: true
+  },
+  {
+    slug: '3d building',
+    filter: () => false,
+    defaultVisibility: false
   }
 ];
 
@@ -127,28 +187,28 @@ export const DEFAULT_MAP_STYLES = [
   {
     id: 'dark',
     label: 'Dark',
-    url: `${STYLE_PREFIX}/dark`,
+    url: 'mapbox://styles/uberdata/cjoqbbf6l9k302sl96tyvka09',
     icon: `${ICON_PREFIX}/UBER_DARK_V2.png`,
     layerGroups: DEFAULT_LAYER_GROUPS
   },
   {
     id: 'light',
     label: 'Light',
-    url: `${STYLE_PREFIX}/light`,
+    url: 'mapbox://styles/uberdata/cjoqb9j339k1f2sl9t5ic5bn4',
     icon: `${ICON_PREFIX}/UBER_LIGHT_V2.png`,
     layerGroups: DEFAULT_LAYER_GROUPS
   },
   {
     id: 'muted',
     label: 'Muted Light',
-    url: `${STYLE_PREFIX}/muted-light`,
+    url: 'mapbox://styles/uberdata/cjfyl03kp1tul2smf5v2tbdd4',
     icon: `${ICON_PREFIX}/UBER_MUTED_LIGHT.png`,
     layerGroups: DEFAULT_LAYER_GROUPS
   },
   {
     id: 'muted_night',
     label: 'Muted Night',
-    url: `${STYLE_PREFIX}/muted-night`,
+    url: 'mapbox://styles/uberdata/cjfxhlikmaj1b2soyzevnywgs',
     icon: `${ICON_PREFIX}/UBER_MUTED_NIGHT.png`,
     layerGroups: DEFAULT_LAYER_GROUPS
   }
@@ -215,6 +275,8 @@ const BLUE2 = '106, 160, 206';
 const BLUE3 = '0, 172, 237';
 const GREEN = '106, 160, 56';
 const RED = '237, 88, 106';
+
+export const HIGHLIGH_COLOR_3D = [255, 255, 255, 60];
 
 export const FIELD_COLORS = {
   default: RED
@@ -313,13 +375,13 @@ export const linearFieldAggrScaleFunctions = {
   }
 };
 
-export const OrdinalFieldScaleFunctions = {
+export const ordinalFieldScaleFunctions = {
   [CHANNEL_SCALES.color]: [SCALE_TYPES.ordinal],
   [CHANNEL_SCALES.radius]: [SCALE_TYPES.point],
   [CHANNEL_SCALES.size]: [SCALE_TYPES.point]
 };
 
-export const OrdinalFieldAggrScaleFunctions = {
+export const ordinalFieldAggrScaleFunctions = {
   // [CHANNEL_SCALES.colorAggr]: [SCALE_TYPES.ordinal, SCALE_TYPES.linear],
   [CHANNEL_SCALES.colorAggr]: {
     [AGGREGATION_TYPES.mode]: [SCALE_TYPES.ordinal],
@@ -360,8 +422,8 @@ export const FIELD_OPTS = {
   string: {
     type: 'categorical',
     scale: {
-      ...OrdinalFieldScaleFunctions,
-      ...OrdinalFieldAggrScaleFunctions
+      ...ordinalFieldScaleFunctions,
+      ...ordinalFieldAggrScaleFunctions
     },
     format: {
       legend: d => d
@@ -400,8 +462,8 @@ export const FIELD_OPTS = {
   boolean: {
     type: 'boolean',
     scale: {
-      ...OrdinalFieldScaleFunctions,
-      ...OrdinalFieldAggrScaleFunctions
+      ...ordinalFieldScaleFunctions,
+      ...ordinalFieldAggrScaleFunctions
     },
     format: {
       legend: d => d
@@ -409,8 +471,8 @@ export const FIELD_OPTS = {
   },
   date: {
     scale: {
-      ...OrdinalFieldScaleFunctions,
-      ...OrdinalFieldAggrScaleFunctions
+      ...ordinalFieldScaleFunctions,
+      ...ordinalFieldAggrScaleFunctions
     },
     format: {
       legend: d => d
@@ -472,30 +534,27 @@ export const DEFAULT_LIGHT_SETTINGS = {
   numberOfLights: 2
 };
 
-export const NO_VALUE_COLOR = [147, 147, 147];
+export const NO_VALUE_COLOR = [0, 0, 0, 0];
 
 export const LAYER_BLENDINGS = {
   additive: {
-    enable: true,
     blendFunc: ['SRC_ALPHA', 'DST_ALPHA'],
     blendEquation: 'FUNC_ADD'
   },
   normal: {
-    enable: true,
     // reference to
     // https://limnu.com/webgl-blending-youre-probably-wrong/
-    blendFuncSeparate: [
+    blendFunc: [
       'SRC_ALPHA',
       'ONE_MINUS_SRC_ALPHA',
       'ONE',
       'ONE_MINUS_SRC_ALPHA'
     ],
-    blendEquationSeparate: ['FUNC_ADD', 'FUNC_ADD']
+    blendEquation: ['FUNC_ADD', 'FUNC_ADD']
   },
   subtractive: {
-    enable: true,
-    blendFuncSeparate: ['ONE', 'ONE_MINUS_DST_COLOR', 'SRC_ALPHA', 'DST_ALPHA'],
-    blendEquationSeparate: ['FUNC_SUBTRACT', 'FUNC_ADD']
+    blendFunc: ['ONE', 'ONE_MINUS_DST_COLOR', 'SRC_ALPHA', 'DST_ALPHA'],
+    blendEquation: ['FUNC_SUBTRACT', 'FUNC_ADD']
   }
 };
 
@@ -561,7 +620,7 @@ export const EXPORT_DATA_TYPE = keyMirror({
 export const EXPORT_DATA_TYPE_OPTIONS = [
   {
     id: EXPORT_DATA_TYPE.CSV,
-    label: 'csv',
+    label: EXPORT_DATA_TYPE.CSV.toLowerCase(),
     available: true
   }
   // {
@@ -585,3 +644,44 @@ export const EXPORT_DATA_TYPE_OPTIONS = [
   //   available: false
   // }
 ];
+
+// Export map types
+export const EXPORT_MAP_FORMAT = keyMirror({
+  HTML: null,
+  JSON: null
+});
+
+// Export map options
+export const EXPORT_MAP_FORMAT_OPTIONS = Object.entries(EXPORT_MAP_FORMAT)
+  .map(entry => ({
+    id: entry[0],
+    label: entry[1].toLowerCase(),
+    available: true
+  }));
+
+export const DEFAULT_UUID_COUNT = 6;
+
+export const DEFAULT_NOTIFICATION_MESSAGE = 'MESSAGE_NOT_PROVIDED';
+
+export const DEFAULT_NOTIFICATION_TYPES = keyMirror({
+  info: null,
+  error: null,
+  warning: null,
+  success: null
+});
+
+export const DEFAULT_NOTIFICATION_TOPICS = keyMirror({
+  global: null,
+  file: null
+});
+
+export const TOKEN_MISUSE_WARNING = '* If you do not provide your own token, the map may fail to display at any time when we replace ours to avoid misuse. ';
+export const DISCLAIMER = 'You can change the Mapbox token later using the following instructions: ';
+export const MAP_CONFIG_DESCRIPTION = 'Map config will be included in the Json file. If you are using kepler.gl in your own app. You can copy this config and pass it to ';
+
+export const EDITOR_MODES = {
+  READ_ONLY: EditorModes.READ_ONLY,
+  DRAW_POLYGON: EditorModes.DRAW_POLYGON,
+  DRAW_RECTANGLE: EditorModes.DRAW_RECTANGLE,
+  EDIT_VERTEX: EditorModes.EDIT_VERTEX
+};
